@@ -180,7 +180,7 @@ function itineraryTabHtml(trip) {
     .join("");
 
   return `
-    ${items.length ? rows : emptyState("No itinerary items yet. Add flights, lodging, or activities below.")}
+    ${items.length ? rows : emptyStateHtml("No itinerary items yet. Add flights, lodging, or activities below.")}
     <form class="card form" onsubmit="handleAddItinerary(event, '${trip.id}')">
       <h2>Add to itinerary</h2>
       <label>Type
@@ -260,7 +260,7 @@ function packingTabHtml(trip) {
 
   return `
     ${items.length ? `<p class="muted small">${packed} / ${items.length} packed</p>` : ""}
-    ${items.length ? sections : emptyState("No packing items yet. Add some below.")}
+    ${items.length ? sections : emptyStateHtml("No packing items yet. Add some below.")}
     <form class="card form" onsubmit="handleAddPacking(event, '${trip.id}')">
       <h2>Add packing item</h2>
       <div class="row">
@@ -320,7 +320,7 @@ function budgetTabHtml(trip) {
       <span>Total spent</span>
       <span class="total-amount">${formatAmount(total, items[0]?.currency)}</span>
     </div>
-    ${items.length ? rows : emptyState("No expenses logged yet.")}
+    ${items.length ? rows : emptyStateHtml("No expenses logged yet.")}
     <form class="card form" onsubmit="handleAddBudget(event, '${trip.id}')">
       <h2>Log an expense</h2>
       <label>Description
@@ -384,7 +384,7 @@ function notesTabHtml(trip) {
     .join("");
 
   return `
-    ${notes.length ? rows : emptyState("No notes yet. Good things to save here: confirmation numbers, passport/visa expiry dates, insurance policy numbers, emergency contacts.")}
+    ${notes.length ? rows : emptyStateHtml("No notes yet. Good things to save here: confirmation numbers, passport/visa expiry dates, insurance policy numbers, emergency contacts.")}
     <form class="card form" onsubmit="handleAddNote(event, '${trip.id}')">
       <h2>Add a note</h2>
       <label>Title
@@ -412,7 +412,7 @@ function handleDeleteNote(tripId, noteId) {
 
 /* ------------------------------- Helpers -------------------------------- */
 
-function emptyState(text) {
+function emptyStateHtml(text) {
   return `<p class="muted empty-state">${escapeHtml(text)}</p>`;
 }
 
