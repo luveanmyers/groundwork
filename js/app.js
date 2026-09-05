@@ -73,27 +73,193 @@ let mapDemoPinsEnabled = false;
 let mapActiveIdeaId = null;
 let mapClickedIdeaId = null;
 
+// Which top-level screen is showing: "home" (the bento landing page),
+// "tripsList" (My Trips), "newTrip" (the create-trip form), or "trip"
+// (inside an active trip - itinerary/packing/etc. tabs). In-memory
+// only, like everything else in this block - always starts back at
+// "home" on a fresh load, by design (see product-decisions.md's Home
+// screen section), even if a trip is still active - the hero banner
+// on Home is what lets you jump straight back in.
+let currentScreen = "home";
+
+// Whether the hamburger dropdown (shown on every screen except Home)
+// is currently open. In-memory only.
+let isMenuOpen = false;
+
 // Grabs the single element we render everything into.
 function appRoot() {
   return document.getElementById("app");
 }
 
-// The main entry point. Decides: show the "pick a trip" screen, or show
-// the currently active trip's screen.
+// The main entry point. Decides which top-level screen to show, based
+// on currentScreen. Home is deliberately NOT gated on whether a trip
+// exists - it's always reachable, and its hero banner is what shows/
+// hides depending on trip state (see renderHomeScreen below).
 function render() {
-  const trip = getActiveTrip();
-  if (!trip) {
-    renderTripsScreen();
+  if (currentScreen === "tripsList") {
+    renderTripsListScreen();
+  } else if (currentScreen === "newTrip") {
+    renderNewTripScreen();
+  } else if (currentScreen === "trip") {
+    const trip = getActiveTrip();
+    if (!trip) {
+      // Active trip vanished (e.g. deleted) - fall back to Home rather
+      // than rendering a blank screen.
+      currentScreen = "home";
+      renderHomeScreen();
+    } else {
+      renderTripScreen(trip);
+    }
   } else {
-    renderTripScreen(trip);
+    renderHomeScreen();
   }
 }
 
+/* ------------------------- Navigation helpers ------------------------- */
+// Every screen change goes through one of these three, so there's a
+// single place that closes the hamburger menu and re-renders - no
+// screen-switching code path can forget to do either.
+
+function goHome() {
+  currentScreen = "home";
+  isMenuOpen = false;
+  render();
+}
+
+function goToScreen(screen) {
+  currentScreen = screen;
+  isMenuOpen = false;
+  render();
+}
+
+function toggleMenu() {
+  isMenuOpen = !isMenuOpen;
+  render();
+}
+
+/* ---------------------------- Small icon svgs --------------------------- */
+// Plain inline SVGs (not an icon font/library, to keep this dependency-
+// free) reused across the hamburger dropdown and the Home bento tiles.
+// `cls` lets a caller add "tile-icon" for the bigger bento sizing; the
+// dropdown uses the default (no class) size below.
+
+function hamburgerIconSvg(cls) {
+  return `<svg class="${cls || ""}" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`;
+}
+function homeIconSvg(cls) {
+  return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>`;
+}
+function tripsIconSvg(cls) {
+  return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="7" y1="14" x2="12" y2="14"/></svg>`;
+}
+function plusIconSvg(cls) {
+  return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+}
+function dashboardIconSvg(cls) {
+  return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="19" x2="4" y2="10"/><line x1="12" y1="19" x2="12" y2="4"/><line x1="20" y1="19" x2="20" y2="14"/></svg>`;
+}
+function settingsIconSvg(cls) {
+  return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+}
+
+/* ----------------------------- Hamburger menu --------------------------- */
+// Shown in the header of every screen except Home (whose bento tiles
+// already ARE the navigation - a menu there would just duplicate
+// them). Opens a dropdown that jumps straight to any section in one
+// tap, rather than forcing a detour back through Home first. Dashboard
+// and Settings are listed but disabled (muted, no click handler) since
+// neither is built yet - see backlog.md.
+
+function menuButtonHtml() {
+  const dropdown = isMenuOpen
+    ? `
+      <div class="menu-dropdown">
+        <div class="menu-item" onclick="event.stopPropagation(); goHome()">${homeIconSvg()} Home</div>
+        <div class="menu-item" onclick="event.stopPropagation(); goToScreen('tripsList')">${tripsIconSvg()} My Trips</div>
+        <div class="menu-item" onclick="event.stopPropagation(); goToScreen('newTrip')">${plusIconSvg()} Start a New Trip</div>
+        <div class="menu-item muted" title="Coming soon">${dashboardIconSvg()} Dashboard</div>
+        <div class="menu-item muted" title="Coming soon">${settingsIconSvg()} Settings</div>
+      </div>`
+    : "";
+  return `
+    <button class="icon-btn" onclick="event.stopPropagation(); toggleMenu()" aria-label="Menu">
+      ${hamburgerIconSvg()}
+      ${dropdown}
+    </button>
+    ${isMenuOpen ? `<div class="menu-overlay" onclick="toggleMenu()"></div>` : ""}
+  `;
+}
+
 /* ========================================================================
-   SCREEN 1: Trip list / create a trip
+   SCREEN: Home (bento landing page)
+   ======================================================================== */
+// A hero banner (the only state-aware part - shows "Continue [trip]"
+// when one's active, an empty-state prompt when there isn't) sitting
+// above a tile grid that never changes shape regardless of trip state.
+// See product-decisions.md's Home screen section and
+// mockup/home-mockup.html (retired once this was reviewed) for what
+// was confirmed before this got built.
+
+function renderHomeScreen() {
+  const trip = getActiveTrip();
+  const trips = getTrips();
+
+  const banner = trip
+    ? `
+      <div class="hero-banner" onclick="openTrip('${trip.id}')">
+        <div class="eyebrow">Continue</div>
+        <div class="trip-name">${escapeHtml(trip.name)}</div>
+        <div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>
+      </div>`
+    : `
+      <div class="hero-banner empty">
+        <div class="eyebrow">No trip in progress</div>
+        <div class="trip-name">Ready to plan your next one?</div>
+      </div>`;
+
+  appRoot().innerHTML = `
+    <header class="app-header">
+      <h1>Groundwork</h1>
+    </header>
+    <main class="screen">
+      ${banner}
+      <div class="bento-grid">
+        <div class="tile tile-trips" onclick="goToScreen('tripsList')">
+          ${tripsIconSvg("tile-icon")}
+          <div>
+            <div class="tile-label">My Trips</div>
+            <div class="tile-sub">${trips.length} trip${trips.length === 1 ? "" : "s"} saved</div>
+          </div>
+        </div>
+        <div class="tile tile-new" onclick="goToScreen('newTrip')">
+          ${plusIconSvg("tile-icon")}
+          <div class="tile-label">Start a New Trip</div>
+        </div>
+        <div class="tile tile-dash disabled" title="Coming soon">
+          ${dashboardIconSvg("tile-icon")}
+          <div>
+            <div class="tile-label">Dashboard</div>
+            <div class="coming-soon-badge">Coming soon</div>
+          </div>
+        </div>
+        <div class="tile tile-settings disabled" title="Coming soon">
+          ${settingsIconSvg("tile-icon")}
+          <div>
+            <div class="tile-label">Settings</div>
+            <div class="coming-soon-badge">Coming soon</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  `;
+}
+
+/* ========================================================================
+   SCREEN: My Trips (list only - the create-trip form now lives on its
+   own screen, see renderNewTripScreen below)
    ======================================================================== */
 
-function renderTripsScreen() {
+function renderTripsListScreen() {
   const trips = getTrips();
 
   const tripRows = trips
@@ -111,13 +277,27 @@ function renderTripsScreen() {
 
   appRoot().innerHTML = `
     <header class="app-header">
+      ${menuButtonHtml()}
       <h1>My Trips</h1>
     </header>
     <main class="screen">
-      ${trips.length ? tripRows : `<p class="muted empty-state">No trips yet. Add your first one below - everything you enter is stored only on this phone.</p>`}
+      ${trips.length ? tripRows : `<p class="muted empty-state">No trips yet. <a href="#" onclick="event.preventDefault(); goToScreen('newTrip')">Start your first one</a> - everything you enter is stored only on this phone.</p>`}
+    </main>
+  `;
+}
 
+/* ========================================================================
+   SCREEN: Start a New Trip (create-trip form, on its own screen)
+   ======================================================================== */
+
+function renderNewTripScreen() {
+  appRoot().innerHTML = `
+    <header class="app-header">
+      ${menuButtonHtml()}
+      <h1>New Trip</h1>
+    </header>
+    <main class="screen">
       <form class="card form" onsubmit="handleCreateTrip(event)">
-        <h2>New trip</h2>
         <label>Trip name
           <input name="name" type="text" placeholder="e.g. Japan 2026" required />
         </label>
@@ -150,16 +330,19 @@ function handleCreateTrip(event) {
     endDate: form.endDate.value
   });
   currentTab = "itinerary";
+  currentScreen = "trip";
   render();
 }
 
 function openTrip(tripId) {
   setActiveTrip(tripId);
   currentTab = "itinerary";
+  currentScreen = "trip";
   ideaFilters = defaultIdeaFilters();
   expandedIdeaIds = new Set();
   draggedIdeaId = null;
   isAddIdeaFormOpen = false;
+  isMenuOpen = false;
   render();
 }
 
@@ -171,13 +354,13 @@ function confirmDeleteTrip(tripId) {
 }
 
 /* ========================================================================
-   SCREEN 2: Inside a trip (itinerary / packing / budget / notes)
+   SCREEN: Inside a trip (itinerary / packing / budget / notes)
    ======================================================================== */
 
 function renderTripScreen(trip) {
   appRoot().innerHTML = `
     <header class="app-header">
-      <button class="icon-btn" onclick="backToTrips()" aria-label="Back to trips">&larr;</button>
+      ${menuButtonHtml()}
       <div>
         <h1>${escapeHtml(trip.name)}</h1>
         <div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>
@@ -193,11 +376,6 @@ function renderTripScreen(trip) {
     </nav>
   `;
   renderTabContent(trip);
-}
-
-function backToTrips() {
-  setActiveTrip(null);
-  render();
 }
 
 function showTab(tab) {

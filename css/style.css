@@ -1100,3 +1100,155 @@ button.primary:active {
   color: var(--accent);
   font-weight: 600;
 }
+
+
+/* ============================================================================
+   Home screen (bento) - built 2026-09-05
+   ============================================================================ */
+/* A state-aware hero banner (the only part that knows whether a trip is
+   active) sits above a tile grid that never changes shape regardless of
+   trip state - so nothing ever looks "broken" when there's no active
+   trip, only the banner above it changes. Reviewed first as
+   mockup/home-mockup.html (now retired) - see product-decisions.md for
+   the full design conversation. Tile colors below are placeholder,
+   reused from this file's existing --accent/--accent-2/--stage-*
+   tokens rather than new ones - not a design-language decision, see
+   hard-to-change-log.md. */
+
+.hero-banner {
+  background: linear-gradient(135deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+.hero-banner .eyebrow {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.hero-banner .trip-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.hero-banner.empty {
+  border-style: dashed;
+  border-color: var(--muted);
+  text-align: center;
+  cursor: default;
+}
+.hero-banner.empty .eyebrow {
+  color: var(--muted);
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 130px);
+  grid-template-areas:
+    "trips trips new new"
+    "trips trips dash settings";
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .bento-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 150px 90px 90px;
+    grid-template-areas:
+      "trips trips"
+      "new new"
+      "dash settings";
+  }
+}
+.tile {
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  color: #04121f;
+}
+.tile .tile-icon {
+  width: 26px;
+  height: 26px;
+}
+.tile .tile-label {
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin-top: 10px;
+}
+.tile .tile-sub {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.tile-trips { grid-area: trips; background: var(--accent); }
+.tile-new { grid-area: new; background: var(--accent-2); }
+.tile-dash { grid-area: dash; background: var(--stage-itinerary); }
+.tile-settings { grid-area: settings; background: var(--stage-ideas); }
+.tile.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.coming-soon-badge {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(4, 18, 31, 0.35);
+  padding: 2px 7px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-top: 6px;
+}
+
+/* --------------------------- Hamburger menu -------------------------- */
+/* The single navigation trigger shown on every screen except Home
+   (whose bento tiles already are the navigation). Opens a dropdown
+   that jumps straight to any section - see product-decisions.md. */
+
+.icon-btn {
+  position: relative;
+}
+.menu-dropdown {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 190px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  text-align: left;
+}
+.menu-dropdown .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--text);
+}
+.menu-dropdown .menu-item:hover {
+  background: var(--surface-2);
+}
+.menu-dropdown .menu-item.muted {
+  cursor: default;
+  color: var(--muted);
+}
+.menu-dropdown .menu-item.muted:hover {
+  background: none;
+}
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
