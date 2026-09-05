@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Groundwork — Map/Table Mockup</title>
+<style>
+  /* ---- Real app tokens + the handful of classes this mockup reuses ----
+     Copied in verbatim from css/style.css (not re-guessed) so this file
+     renders correctly wherever it's opened - standalone, in the chat
+     preview, or from inside the repo - instead of depending on a
+     relative <link> that only resolves in one of those places. If you
+     ever see this looking unstyled/black-and-white again, this is the
+     first thing to check: it means the tokens below didn't load, not
+     that the design language changed. */
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #273449;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-2: #fbbf24;
+    --danger: #f87171;
+    --radius: 14px;
+
+    /* Stage colors (kanban column) - deliberately NOT reusing --accent /
+       --accent-2 / --danger, since those already mean something else on
+       every card (activity type, style, urgent/reservation badges).
+       Reusing them for stage too was confusing - a blue pin looked like
+       it meant "activity type" not "in The Itinerary." These three are
+       new hues that don't collide with anything else in the app yet. */
+    --stage-ideas: #a78bfa;
+    --stage-plan: #2dd4bf;
+    --stage-itinerary: #4ade80;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .muted { color: var(--muted); }
+  .small { font-size: 0.85rem; }
+
+  .pill {
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .pill-activity {
+    background: rgba(56, 189, 248, 0.18);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+  }
+
+  .pill-style {
+    background: rgba(251, 191, 36, 0.14);
+    color: var(--accent-2);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+  }
+
+  .badge-flag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .badge-urgent { background: var(--danger); color: #2a0a0a; }
+  .badge-reservation-needed {
+    background: rgba(251, 191, 36, 0.18);
+    color: var(--accent-2);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+  }
+  .badge-reserved {
+    background: rgba(56, 189, 248, 0.18);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+  }
+
+  .pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent);
+    color: #04121f;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 14px;
+  }
+
+  .pill-btn:active { opacity: 0.85; }
+
+  .idea-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .idea-filter-bar select {
+    background: var(--surface-2);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+
+  .idea-filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .idea-filter-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+  }
+
+  /* ---- Mockup-only chrome (review notes, view toggle, map/list panes) ----
+     None of this touches css/style.css - it's new, and everything here
+     is a first draft for Luvean to react to, not a locked decision. */
+
+  body {
+    padding: 24px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  .mockup-banner {
+    background: var(--surface-2);
+    border: 1px dashed var(--accent);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .mockup-banner strong { color: var(--text); }
+
+  /* --------------------------- View toggle --------------------------- */
+  /* Sits where the "+ Add idea" pill already lives in the real Ideas
+     tab. Segmented control, not a dropdown, since there are only ever
+     two states and both should be visible at once (Zillow's own toggle
+     works the same way). */
+  .toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .view-toggle {
+    display: inline-flex;
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .view-toggle button {
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .view-toggle button.active {
+    background: var(--accent);
+    color: #04121f;
+  }
+
+  /* ------------------------- Board placeholder ------------------------ */
+  /* The real kanban board already exists and isn't being redesigned
+     here - this is just enough to show what the toggle switches AWAY
+     FROM, so the mockup doesn't feel like it starts nowhere. */
+  .board-ghost {
+    display: flex;
+    gap: 20px;
+  }
+
+  .board-ghost-col {
+    flex: 1;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+
+  .board-ghost-col h3 {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .board-ghost-bar {
+    height: 46px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    margin-bottom: 8px;
+    opacity: 0.6;
+  }
+
+  .board-ghost-note {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 16px;
+  }
+
+  /* ---------------------------- Map view ------------------------------ */
+  .map-view {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+  }
+
+  .map-list-pane {
+    width: 360px;
+    flex-shrink: 0;
+    max-height: 560px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .map-pane {
+    flex: 1;
+    position: relative;
+    height: 560px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background:
+      radial-gradient(circle, rgba(148,163,184,0.14) 1px, transparent 1px) 0 0/22px 22px,
+      var(--surface);
+    border: 1px solid var(--surface-2);
+  }
+
+  /* A schematic landmass, not a real map - just enough shape that this
+     reads as "a map" rather than "a card with dots on it." Swapped for
+     real Leaflet/OpenStreetMap tiles once this is actually built. */
+  .map-landmass {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  .map-caption {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: rgba(15, 23, 42, 0.7);
+    padding: 4px 8px;
+    border-radius: 6px;
+    z-index: 1;
+  }
+
+  .map-region-label {
+    position: absolute;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .map-pin {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.12s ease;
+    z-index: 2;
+  }
+
+  .map-pin-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  .map-pin-dot.stage-ideas { background: var(--stage-ideas); }
+  .map-pin-dot.stage-plan { background: var(--stage-plan); }
+  .map-pin-dot.stage-itinerary { background: var(--stage-itinerary); }
+
+  .map-pin.is-active {
+    transform: translate(-50%, -100%) scale(1.35);
+    z-index: 5;
+  }
+
+  .map-pin-label {
+    display: none;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    margin-bottom: 4px;
+    border: 1px solid var(--surface-2);
+  }
+
+  .map-pin.is-active .map-pin-label,
+  .map-pin:hover .map-pin-label {
+    display: block;
+  }
+
+  .map-legend {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.75);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    z-index: 1;
+  }
+
+  .map-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .map-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ------------------------- Compact list card ------------------------ */
+  .maplist-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+
+  .maplist-card:hover,
+  .maplist-card.is-active {
+    border-color: var(--accent);
+    background: var(--surface-2);
+  }
+
+  .maplist-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .maplist-card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .maplist-stage-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .maplist-card-region {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .maplist-card-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 7px;
+  }
+
+  .maplist-card-detail {
+    display: none;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--surface-2);
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .maplist-card.is-active .maplist-card-detail {
+    display: block;
+  }
+
+  /* ------------------------- Not-on-map section ------------------------ */
+  .not-on-map {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--surface-2);
+  }
+
+  .not-on-map h4 {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 0 0 8px;
+  }
+
+  .not-on-map-card {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+
+  .not-on-map-reason {
+    color: var(--accent-2);
+    font-size: 0.75rem;
+    margin-top: 2px;
+  }
+
+  .not-on-map-reason.is-failed { color: var(--danger); }
+
+  /* --------------------------- Review notes ---------------------------- */
+  .review-notes {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 2px solid var(--surface-2);
+  }
+
+  .review-notes h2 {
+    font-size: 1.05rem;
+  }
+
+  .review-notes ol {
+    padding-left: 20px;
+  }
+
+  .review-notes li {
+    margin-bottom: 14px;
+    line-height: 1.5;
+    font-size: 0.92rem;
+  }
+
+  .review-notes li strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+  <div class="mockup-banner">
+    <strong>Mockup, not live code.</strong> This is a static/interactive review copy of the proposed Ideas-board Map view —
+    it's not wired to real storage.js data, and the map itself is a placeholder illustration, not real Leaflet/OpenStreetMap
+    tiles (those need live network tiles, which don't make sense to load just for a design review). Everything here is a
+    first draft — see the numbered notes at the bottom for the specific choices I want you to weigh in on before this
+    becomes real code.
+  </div>
+
+  <div class="toolbar-row">
+    <button type="button" class="pill-btn" style="margin-bottom:0;">+ Add idea</button>
+    <div class="view-toggle">
+      <button type="button" id="btn-board" class="active" onclick="setView('board')">Board</button>
+      <button type="button" id="btn-map" onclick="setView('map')">Map</button>
+    </div>
+  </div>
+
+  <!-- Filter bar - identical fields/behavior to the real Ideas tab filter
+       bar, and shared across both views (this is the actual build
+       requirement from product-decisions.md: "map and result cards...
+       both filterable together"). Live-wired here with the mock data
+       below so you can feel it, not just see it. -->
+  <div class="idea-filter-bar">
+    <select id="f-activityType" onchange="applyFiltersAndRender()">
+      <option value="all">All categories</option>
+      <option value="land">Land Activities</option>
+      <option value="water">Water &amp; Diving</option>
+      <option value="historical">Historical &amp; Cultural</option>
+      <option value="food">Food &amp; Wine</option>
+      <option value="exploring">Exploring &amp; Sightseeing</option>
+      <option value="other">Other</option>
+    </select>
+    <select id="f-style" onchange="applyFiltersAndRender()">
+      <option value="all">All styles</option>
+      <option value="guided">Guided</option>
+      <option value="self-guided">Self-guided</option>
+      <option value="official">Official route</option>
+      <option value="casual">Casual</option>
+      <option value="none">None/not applicable</option>
+    </select>
+    <select id="f-region" onchange="applyFiltersAndRender()">
+      <option value="all">All regions</option>
+      <option value="Cape Town">Cape Town</option>
+      <option value="Garden Route">Garden Route</option>
+      <option value="Winelands">Winelands</option>
+      <option value="Kruger">Kruger</option>
+      <option value="Johannesburg">Johannesburg</option>
+    </select>
+    <select id="f-reservation" onchange="applyFiltersAndRender()">
+      <option value="all">All reservation statuses</option>
+      <option value="not_needed">No reservation needed</option>
+      <option value="needs_reservation">Needs reservation</option>
+      <option value="reserved">Reserved</option>
+    </select>
+    <!-- New per your request: filter by kanban stage. Lives in the one
+         shared filter bar (same bar drives Board and Map both) rather
+         than being Map-only, since one filter set is simpler than two -
+         on Map it actually narrows what's plotted; on Board, since the
+         columns already separate stages visually, this mockup doesn't
+         wire it up there (the board panel here is just a placeholder),
+         but the real build would use it the same way the other filters
+         already do: hide non-matching cards from whichever columns
+         they'd otherwise be in. -->
+    <select id="f-stage" onchange="applyFiltersAndRender()">
+      <option value="all">All stages</option>
+      <option value="ideas">The Ideas</option>
+      <option value="plan">The Plan</option>
+      <option value="itinerary">The Itinerary</option>
+    </select>
+    <label class="idea-filter-checkbox">
+      <input type="checkbox" id="f-urgent" onchange="applyFiltersAndRender()" />
+      <span>Urgent only</span>
+    </label>
+  </div>
+
+  <!-- Board placeholder (unchanged real feature, shown collapsed here) -->
+  <div id="board-panel">
+    <div class="board-ghost">
+      <div class="board-ghost-col">
+        <h3>The Ideas</h3>
+        <div class="board-ghost-bar"></div>
+        <div class="board-ghost-bar"></div>
+        <div class="board-ghost-bar"></div>
+      </div>
+      <div class="board-ghost-col">
+        <h3>The Plan</h3>
+        <div class="board-ghost-bar"></div>
+        <div class="board-ghost-bar"></div>
+      </div>
+      <div class="board-ghost-col">
+        <h3>The Itinerary</h3>
+        <div class="board-ghost-bar"></div>
+      </div>
+    </div>
+    <p class="board-ghost-note">This is your existing kanban board — nothing about it changes. Click "Map" above to see the new view.</p>
+  </div>
+
+  <!-- Map view -->
+  <div id="map-panel" class="map-view" style="display:none;">
+    <div class="map-list-pane" id="map-list-pane"></div>
+    <div class="map-pane">
+      <!-- Schematic landmass - not a real coastline, just a shape so the
+           pane reads as geography rather than a blank surface with dots
+           floating on it. Real build replaces this whole element with
+           Leaflet tiles. -->
+      <svg class="map-landmass" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path d="M -5,105 L -5,58 Q 6,44 18,52 Q 30,44 34,58 Q 44,66 52,52
+                 Q 58,60 68,50 Q 74,58 82,42 Q 90,28 98,18 L 105,105 Z"
+              fill="rgba(56,189,248,0.10)" stroke="rgba(56,189,248,0.4)" stroke-width="0.6" />
+      </svg>
+      <div class="map-region-label" style="left:8%; top:58%;">Winelands</div>
+      <div class="map-region-label" style="left:6%; top:70%;">Cape Town</div>
+      <div class="map-region-label" style="left:40%; top:74%;">Garden Route</div>
+      <div class="map-region-label" style="left:68%; top:14%;">Gauteng / Kruger</div>
+      <div class="map-legend">
+        <div class="map-legend-row"><span class="map-legend-dot" style="background:var(--stage-ideas);"></span> The Ideas</div>
+        <div class="map-legend-row"><span class="map-legend-dot" style="background:var(--stage-plan);"></span> The Plan</div>
+        <div class="map-legend-row"><span class="map-legend-dot" style="background:var(--stage-itinerary);"></span> The Itinerary</div>
+      </div>
+      <div id="map-pins"></div>
+      <div class="map-caption">Illustrative placeholder — real build renders actual OpenStreetMap tiles via Leaflet, centered on South Africa.</div>
+    </div>
+  </div>
+
+  <script>
+    // ------------------------------------------------------------------
+    // Mock data only — shaped like the real idea-card object in
+    // storage.js (see product-decisions.md) but hand-written here, not
+    // pulled from real storage. `x`/`y` are percentage positions on the
+    // placeholder map canvas, standing in for what geocode()/lat/lng
+    // would really drive.
+    // ------------------------------------------------------------------
+    const MOCK_IDEAS = [
+      { id: "1", title: "Table Mountain cable car", region: "Cape Town", activityType: "land", style: "self-guided",
+        stage: "itinerary", reservationNeeded: true, reserved: true, urgent: false,
+        description: "Booked for our first full day — weather-dependent, has a flexible-date ticket.",
+        x: 15, y: 78 },
+      { id: "2", title: "Boulders Beach penguins", region: "Cape Town", activityType: "water", style: "casual",
+        stage: "plan", reservationNeeded: false, reserved: false, urgent: false,
+        description: "Half-day, no booking needed — just show up.", x: 20, y: 84 },
+      { id: "3", title: "Robben Island tour", region: "Cape Town", activityType: "historical", style: "guided",
+        stage: "ideas", reservationNeeded: true, reserved: false, urgent: true,
+        description: "Ferry tickets sell out days ahead in peak season — still deciding if this fits the schedule.",
+        x: 11, y: 73 },
+      { id: "4", title: "Stellenbosch wine tasting", region: "Winelands", activityType: "food", style: "guided",
+        stage: "plan", reservationNeeded: true, reserved: false, urgent: false,
+        description: "Looking at a small-group tasting tour, haven't booked yet.", x: 25, y: 64 },
+      { id: "5", title: "Kruger safari (2 nights)", region: "Kruger", activityType: "exploring", style: "guided",
+        stage: "itinerary", reservationNeeded: true, reserved: true, urgent: true,
+        description: "Locked in — this was the one hard deadline that shaped the whole route.", x: 80, y: 20 },
+      { id: "6", title: "Apartheid Museum", region: "Johannesburg", activityType: "historical", style: "self-guided",
+        stage: "ideas", reservationNeeded: false, reserved: false, urgent: false,
+        description: "Maybe on the layover day in Joburg.", x: 72, y: 28 },
+      { id: "7", title: "Bloukrans Bridge bungee", region: "Garden Route", activityType: "land", style: "official",
+        stage: "ideas", reservationNeeded: false, reserved: false, urgent: false,
+        description: "Still a maybe — Dave's more into this than I am.", x: 46, y: 78 },
+      // These two intentionally have no plottable location, to show how
+      // that case reads in the list + map together.
+      { id: "8", title: "Cape Point nature reserve hike", region: "Cape Town", activityType: "land", style: "self-guided",
+        stage: "plan", reservationNeeded: false, reserved: false, urgent: false,
+        description: "Wanted this near Table Mountain, but the location search didn't find a clean match yet.",
+        notPlotted: "failed" },
+      { id: "9", title: "Lion's Head sunrise hike", region: "Cape Town", activityType: "land", style: "official",
+        stage: "ideas", reservationNeeded: false, reserved: false, urgent: false,
+        description: "Just added — hasn't gone through location lookup yet.",
+        notPlotted: "pending" }
+    ];
+
+    const ACTIVITY_LABELS = { land: "Land Activities", water: "Water & Diving", historical: "Historical & Cultural",
+      food: "Food & Wine", exploring: "Exploring & Sightseeing", other: "Other" };
+    const STYLE_LABELS = { guided: "Guided", "self-guided": "Self-guided", official: "Official route",
+      casual: "Casual", none: "None/not applicable" };
+    const STAGE_LABELS = { ideas: "The Ideas", plan: "The Plan", itinerary: "The Itinerary" };
+
+    let activeId = null;
+
+    function setView(view) {
+      document.getElementById("board-panel").style.display = view === "board" ? "block" : "none";
+      document.getElementById("map-panel").style.display = view === "map" ? "flex" : "none";
+      document.getElementById("btn-board").classList.toggle("active", view === "board");
+      document.getElementById("btn-map").classList.toggle("active", view === "map");
+      if (view === "map") applyFiltersAndRender();
+    }
+
+    function currentFilters() {
+      return {
+        activityType: document.getElementById("f-activityType").value,
+        style: document.getElementById("f-style").value,
+        region: document.getElementById("f-region").value,
+        reservation: document.getElementById("f-reservation").value,
+        stage: document.getElementById("f-stage").value,
+        urgentOnly: document.getElementById("f-urgent").checked
+      };
+    }
+
+    // Same filter logic as applyIdeaFilters() in the real app.js, plus
+    // the new stage filter.
+    function applyFilters(ideas, f) {
+      return ideas.filter((idea) => {
+        if (f.activityType !== "all" && idea.activityType !== f.activityType) return false;
+        if (f.style !== "all" && idea.style !== f.style) return false;
+        if (f.region !== "all" && idea.region !== f.region) return false;
+        if (f.stage !== "all" && idea.stage !== f.stage) return false;
+        if (f.reservation === "not_needed" && idea.reservationNeeded) return false;
+        if (f.reservation === "needs_reservation" && !(idea.reservationNeeded && !idea.reserved)) return false;
+        if (f.reservation === "reserved" && !(idea.reservationNeeded && idea.reserved)) return false;
+        if (f.urgentOnly && !idea.urgent) return false;
+        return true;
+      });
+    }
+
+    function applyFiltersAndRender() {
+      const filtered = applyFilters(MOCK_IDEAS, currentFilters());
+      const plotted = filtered.filter((i) => !i.notPlotted);
+      const unplotted = filtered.filter((i) => i.notPlotted);
+      renderList(plotted, unplotted);
+      renderPins(plotted);
+    }
+
+    function badgesHtml(idea) {
+      let out = "";
+      if (idea.urgent) out += `<span class="badge-flag badge-urgent">Urgent</span>`;
+      if (idea.reservationNeeded && !idea.reserved) out += `<span class="badge-flag badge-reservation-needed">Needs reservation</span>`;
+      if (idea.reservationNeeded && idea.reserved) out += `<span class="badge-flag badge-reserved">Reserved</span>`;
+      return out;
+    }
+
+    function renderList(plotted, unplotted) {
+      const pane = document.getElementById("map-list-pane");
+      const cards = plotted.map((idea) => `
+        <div class="maplist-card ${idea.id === activeId ? "is-active" : ""}" data-id="${idea.id}"
+             onmouseenter="setActive('${idea.id}')" onmouseleave="setActive(null)" onclick="toggleActive('${idea.id}')">
+          <div class="maplist-card-top">
+            <div>
+              <div class="maplist-card-title">${idea.title}</div>
+              <div class="maplist-card-region">${idea.region} · ${STAGE_LABELS[idea.stage]}</div>
+            </div>
+            <span class="maplist-stage-dot" style="background:${stageColor(idea.stage)}"></span>
+          </div>
+          <div class="maplist-card-pills">
+            <span class="pill pill-activity">${ACTIVITY_LABELS[idea.activityType]}</span>
+            <span class="pill pill-style">${STYLE_LABELS[idea.style]}</span>
+            ${badgesHtml(idea)}
+          </div>
+          <div class="maplist-card-detail">${idea.description}</div>
+        </div>
+      `).join("");
+
+      const unplottedHtml = unplotted.length ? `
+        <div class="not-on-map">
+          <h4>Not shown on map (${unplotted.length})</h4>
+          ${unplotted.map((idea) => `
+            <div class="not-on-map-card">
+              <strong>${idea.title}</strong> · ${idea.region}
+              <div class="not-on-map-reason ${idea.notPlotted === "failed" ? "is-failed" : ""}">
+                ${idea.notPlotted === "failed"
+                  ? "Location not found — edit the idea to try a different search term."
+                  : "Still looking up this location…"}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : "";
+
+      pane.innerHTML = (cards || `<p class="muted small">No ideas match these filters.</p>`) + unplottedHtml;
+    }
+
+    function stageColor(stage) {
+      if (stage === "itinerary") return "var(--stage-itinerary)";
+      if (stage === "plan") return "var(--stage-plan)";
+      return "var(--stage-ideas)";
+    }
+
+    function renderPins(plotted) {
+      const container = document.getElementById("map-pins");
+      container.innerHTML = plotted.map((idea) => `
+        <div class="map-pin ${idea.id === activeId ? "is-active" : ""}" data-id="${idea.id}"
+             style="left:${idea.x}%; top:${idea.y}%;"
+             onmouseenter="handlePinHover('${idea.id}')" onmouseleave="setActive(null)" onclick="handlePinClick('${idea.id}')">
+          <span class="map-pin-label">${idea.title}</span>
+          <span class="map-pin-dot stage-${idea.stage}"></span>
+        </div>
+      `).join("");
+    }
+
+    // Hover sync: entering either a list card or a pin lights up both.
+    // Leaving clears the hover UNLESS that idea is "clicked active"
+    // (toggleActive), which persists until something else is clicked.
+    let clickedId = null;
+    function setActive(id) {
+      activeId = id || clickedId;
+      document.querySelectorAll(".maplist-card").forEach((el) => el.classList.toggle("is-active", el.dataset.id === activeId));
+      document.querySelectorAll(".map-pin").forEach((el) => el.classList.toggle("is-active", el.dataset.id === activeId));
+    }
+
+    function toggleActive(id) {
+      clickedId = clickedId === id ? null : id;
+      setActive(clickedId);
+    }
+
+    // Answers your question about the list scrolling to catch up with a
+    // hovered/clicked pin: only scrolls if the matching card isn't
+    // already fully visible in the list pane, and does it smoothly
+    // rather than snapping, so hovering a pin whose card IS already
+    // visible causes no scroll/jitter at all.
+    function scrollListIntoViewIfNeeded(id) {
+      const pane = document.getElementById("map-list-pane");
+      const el = pane.querySelector(`.maplist-card[data-id="${id}"]`);
+      if (!el) return;
+      const paneRect = pane.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const fullyVisible = elRect.top >= paneRect.top && elRect.bottom <= paneRect.bottom;
+      if (!fullyVisible) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    // Pin-specific handlers (vs. the plain setActive/toggleActive used
+    // by list cards) - only pins need the scroll-catch-up behavior,
+    // since a list card you're already hovering is by definition
+    // already visible.
+    function handlePinHover(id) {
+      setActive(id);
+      scrollListIntoViewIfNeeded(id);
+    }
+
+    function handlePinClick(id) {
+      toggleActive(id);
+      if (clickedId === id) scrollListIntoViewIfNeeded(id);
+    }
+
+    // Initial render.
+    applyFiltersAndRender();
+  </script>
+
+  <div class="review-notes">
+    <h2>Changed based on your last round of feedback</h2>
+    <ol>
+      <li><strong>Toggle placement</strong> — confirmed, unchanged.</li>
+      <li><strong>Pin colors</strong> — no longer reusing blue/amber (those already mean activity type and style on the
+        card). Stage now gets three colors that don't appear anywhere else in the app yet: violet for The Ideas, teal
+        for The Plan, green for The Itinerary. Legend updated to match.</li>
+      <li><strong>Hover-a-pin scrolling</strong> — implemented. Hovering or clicking a pin now checks whether its list
+        card is fully visible in the scrollable list, and only scrolls (smoothly, not a hard jump) if it isn't. A card
+        already in view won't jitter when you hover its pin. Worth testing with the filter bar narrowed down so the list
+        is short, and also with more items visible, to see if the scroll timing/feel is right — flag it if it feels off
+        and we can talk through alternatives.</li>
+      <li><strong>"Not shown on map" stays a separate list section</strong> — confirmed, unchanged.</li>
+      <li><strong>Placeholder map</strong> — confirmed acceptable for review purposes, unchanged.</li>
+      <li><strong>No price-style bubbles</strong> — confirmed, unchanged.</li>
+      <li><strong>List/map split width</strong> — confirmed, unchanged.</li>
+      <li><strong>New: stage filter.</strong> Added "All stages / The Ideas / The Plan / The Itinerary" to the shared
+        filter bar, so you can isolate the map to just one column's worth of pins. It lives in the one filter bar that
+        drives both views rather than a Map-only control, since you said one shared filter is fine. On Map it actually
+        filters the pins/list; the Board panel here is just a static placeholder so it doesn't visibly react to it, but
+        the real build would apply it to the kanban board the same way the existing filters already do.</li>
+    </ol>
+  </div>
+
+</body>
+</html>

@@ -12,8 +12,22 @@
   --text: #f1f5f9;
   --muted: #94a3b8;
   --accent: #38bdf8;
+  --accent-2: #fbbf24;
   --danger: #f87171;
   --radius: 14px;
+
+  /* Stage colors (kanban column), used on the Ideas-board Map view.
+     Deliberately NOT reusing --accent/--accent-2/--danger, since those
+     already mean something else on every card (activity type, style,
+     urgent/reservation badges) - a pin/dot in one of those colors would
+     look like it meant "activity type" or "urgent," not "stage."
+     These are placeholder swatches, not a locked design-language
+     decision - see product-decisions.md's Map view mockup section.
+     Real colors (these included) get decided in the design-language
+     pass once the data layer and functionality are finalized. */
+  --stage-ideas: #a78bfa;
+  --stage-plan: #2dd4bf;
+  --stage-itinerary: #4ade80;
 }
 
 * {
@@ -222,6 +236,841 @@ button.primary {
 button.primary:active {
   opacity: 0.85;
 }
+
+/* -------------------------- Ideas board (kanban) --------------------------- */
+/* The ideation board (Ideas tab): a 3-column kanban board (The Ideas /
+   The Plan / The Itinerary), reviewed first as a mockup in
+   mockup/kanban-mockup.html (now retired - its final approved state is
+   what this section and the Ideas-tab rendering in app.js are built
+   from). See product-decisions.md for what each field means and how
+   columns are derived from the data, and hard-to-change-log.md for
+   which of these choices are cheap to revisit later (mostly
+   wording/colors) vs. not (the underlying field names in storage.js). */
+
+.kanban-board {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+
+/* flex: 1 1 0 makes all three columns share the full board width
+   equally, so the board fills a laptop screen instead of hugging card
+   width; max-width is just a ceiling for very wide monitors. */
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 260px;
+  max-width: 560px;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px 2px;
+}
+
+.kanban-column-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.kanban-column-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* flex: 1 makes this fill all remaining vertical space in the column
+   (itself stretched to match the tallest column), so the whole column
+   body accepts a drop, not just a thin strip hugging the cards. */
+.kanban-dropzone {
+  flex: 1;
+  min-height: 180px;
+  border-radius: var(--radius);
+  padding: 4px;
+  transition: background 0.15s ease, outline 0.15s ease;
+  outline: 2px dashed transparent;
+  outline-offset: -2px;
+}
+
+.kanban-dropzone.drag-over {
+  background: rgba(56, 189, 248, 0.08);
+  outline-color: var(--accent);
+}
+
+.kanban-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  cursor: grab;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.kanban-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.kanban-card.dragging {
+  opacity: 0.35;
+}
+
+.kanban-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kanban-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* Bigger, colored, circular - reads as a button, not a stray character.
+   Highlights further on hover so the whole title row visibly invites a
+   click. */
+.kanban-chevron {
+  color: var(--accent);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.16);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.kanban-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+
+.kanban-card-title-row:hover .kanban-chevron {
+  background: rgba(56, 189, 248, 0.32);
+}
+
+.kanban-card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-card.is-expanded .kanban-card-title {
+  white-space: normal;
+}
+
+.kanban-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.kanban-move-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 6px;
+}
+
+.kanban-move-btn:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.kanban-card-collapsed-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.kanban-card.is-expanded .kanban-card-collapsed-meta {
+  display: none;
+}
+
+/* Separate class from .kanban-card-collapsed-meta on purpose - this
+   pills row lives inside .kanban-card-body (already hidden/shown as a
+   whole via is-expanded), so it must NOT also match the rule above, or
+   it gets force-hidden even while the card is expanded. */
+.kanban-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kanban-card-body {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--surface-2);
+}
+
+.kanban-card.is-expanded .kanban-card-body {
+  display: block;
+}
+
+.pill {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pill-activity {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.pill-style {
+  background: rgba(251, 191, 36, 0.14);
+  color: var(--accent-2);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Small read-only status badges shown in the card header/collapsed
+   view - urgent, needs-reservation, and reserved. Display only; the
+   actual controls that CHANGE these values are the .toggle-pill /
+   .badge-urgent-toggle buttons in the expanded card body below. */
+.badge-flag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge-urgent {
+  background: var(--danger);
+  color: #2a0a0a;
+}
+
+.badge-reservation-needed {
+  background: rgba(251, 191, 36, 0.18);
+  color: var(--accent-2);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.badge-reserved {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.urgency-note {
+  color: var(--danger);
+  font-size: 0.82rem;
+  margin-top: 6px;
+}
+
+.kanban-card-region {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+/* Only rendered once an idea has left The Ideas column - see the
+   comment above exactLocationLine in kanbanCardHtml() in app.js. */
+.kanban-card-exact-location {
+  color: var(--accent);
+  font-size: 0.82rem;
+  margin-top: 6px;
+}
+
+.kanban-card-desc {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.kanban-card-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+/* The actual clickable controls for reservation/reserved/urgent state -
+   only shown in the expanded card body. */
+.kanban-card-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--surface-2);
+}
+
+.toggle-pill {
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid #334155;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle-pill.is-on {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+/* Urgent's toggle button (in the card body) - not the read-only
+   .badge-urgent shown up in the header/collapsed view. Disabled
+   (grayed out) whenever the card doesn't need a reservation at all,
+   since "urgent" only means something when there's a reservation to
+   be urgent about. */
+.badge-urgent-toggle {
+  border: none;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+.badge-urgent-toggle.is-urgent {
+  background: var(--danger);
+  color: #2a0a0a;
+}
+
+.badge-urgent-toggle:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Inline-editable fields for a card's core details (category, style,
+   region, exact location, description, link) - see kanbanCardHtml() /
+   handleUpdateIdeaField() in app.js. Same label-above-control shape as
+   .confirmation-info-field below, which was the original precedent
+   for editing a card in place rather than through a separate form. */
+.idea-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.idea-edit-row {
+  display: flex;
+  gap: 10px;
+}
+
+.idea-edit-row .idea-edit-field {
+  flex: 1;
+}
+
+.idea-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.idea-edit-field input,
+.idea-edit-field select,
+.idea-edit-field textarea {
+  background: var(--surface-2);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.idea-edit-field textarea {
+  min-height: 50px;
+  resize: vertical;
+}
+
+.idea-edit-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.idea-edit-link-row input {
+  flex: 1;
+}
+
+.idea-edit-link-row .kanban-card-link {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+/* Confirmation details - the "reference this while traveling" field.
+   Editable right on the card (not just at add-idea time), since this
+   is usually only known well after the idea itself was added. */
+.confirmation-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.confirmation-info-field textarea {
+  background: var(--surface-2);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  min-height: 50px;
+  resize: vertical;
+}
+
+/* A nudge, not a block - shown when something's marked Reserved but
+   has no confirmation info yet. Doesn't stop you from marking it
+   Reserved in the first place (see product-decisions.md). */
+.confirmation-nudge {
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+
+/* A checkbox row inside a .form that reads left-to-right (checkbox then
+   label) instead of the form's usual label-above-input stacked layout. */
+.form label.form-checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-checkbox-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Grays out a checkbox row or textarea while it's disabled - used in
+   the add-idea form so Urgent/Already reserved/their notes fields
+   visibly gray out together whenever Reservation needed is unchecked
+   (see handleAddFormReservationToggle in app.js), instead of just
+   silently not saving what you typed into them. */
+.form-checkbox-row:has(input:disabled) {
+  opacity: 0.4;
+}
+
+.form textarea:disabled {
+  opacity: 0.4;
+}
+
+/* The "+ Add idea" pill at the top of the Ideas tab, replacing what
+   used to be a form permanently sitting at the bottom of the page. */
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent);
+  color: #04121f;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
+.pill-btn:active {
+  opacity: 0.85;
+}
+
+/* Ideas tab filter bar: a slim single row of plain selects (no card
+   box, no field labels), matching the kanban mockup's filter-bar
+   styling rather than the app's usual boxed .card.form look. */
+.idea-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.idea-filter-bar select {
+  background: var(--surface-2);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.idea-filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.idea-filter-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+/* Small text-only button, for actions that shouldn't look as heavy as
+   button.primary (e.g. "Clear filters") - reusable anywhere that fits. */
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------------------- Ideas board (map view) ---------------------- */
+/* The "Map" half of the Board/Map toggle on the Ideas tab - see
+   app.js's mapViewHtml() and product-decisions.md's "Map view" section.
+   Reviewed first in mockup/map-table-mockup.html (retired once ported
+   here). */
+
+.ideas-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.ideas-toolbar-row .pill-btn {
+  margin-bottom: 0;
+}
+
+.view-toggle {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.view-toggle button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.view-toggle button.active {
+  background: var(--accent);
+  color: #04121f;
+}
+
+.map-view {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.map-list-pane {
+  width: 360px;
+  flex-shrink: 0;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Dot-grid texture stands in for real map tiles until Leaflet is
+   wired up - see the comment on mapViewHtml() in app.js. */
+.map-pane {
+  flex: 1;
+  position: relative;
+  min-height: 400px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    radial-gradient(circle, rgba(148, 163, 184, 0.14) 1px, transparent 1px) 0 0/22px 22px,
+    var(--surface);
+  border: 1px solid var(--surface-2);
+  padding: 10px;
+}
+
+.map-legend {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: rgba(15, 23, 42, 0.75);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 1;
+}
+
+.map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.map-empty-note {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 70%;
+  text-align: center;
+  margin: 0;
+}
+
+.map-caption {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: rgba(15, 23, 42, 0.7);
+  padding: 4px 8px;
+  border-radius: 6px;
+  z-index: 1;
+}
+
+/* Read-only card for a "plotted" idea in the map view's list pane -
+   no hover/click/expand behavior yet, unlike .kanban-card, since
+   there's no pin on the other end of it to sync with yet. */
+.maplist-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.maplist-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.maplist-card-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.maplist-stage-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.maplist-card-region {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.maplist-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+/* Ideas with no confirmed location yet, listed separately rather than
+   hidden - see mapUnplottedHtml() in app.js. */
+.not-on-map {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--surface-2);
+}
+
+.not-on-map h4 {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 8px;
+}
+
+.not-on-map-card {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+}
+
+.not-on-map-reason {
+  color: var(--accent-2);
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.not-on-map-reason.is-failed {
+  color: var(--danger);
+}
+
+/* ---- TEMPORARY: demo pin preview -----------------------------------
+   Everything below is scaffolding for evaluating the pin/hover/click
+   interaction against fake positions before real geocoding exists.
+   Delete this whole block (and its counterparts in app.js) once
+   Phase 2 wires up real geocode()/renderMap() positions. See
+   mapDemoPinsEnabled in app.js and product-decisions.md's "Map view"
+   section. ---------------------------------------------------------- */
+
+.map-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.demo-pins-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.demo-pins-toggle input {
+  cursor: pointer;
+}
+
+.demo-pins-banner {
+  font-size: 0.75rem;
+  color: var(--accent-2);
+  background: rgba(251, 191, 36, 0.12);
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+
+.demo-tag {
+  font-size: 0.6rem;
+  color: var(--muted);
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+/* Interactive treatment only applies to demo-plotted cards - real
+   plotted cards (mapPlottedCardsHtml) stay read-only until Phase 2
+   gives them real pin positions to sync with too. */
+.maplist-card.is-demo {
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.maplist-card.is-demo:hover,
+.maplist-card.is-demo.is-active {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.map-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.12s ease;
+  z-index: 2;
+}
+
+.map-pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid var(--bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.map-pin.is-demo .map-pin-dot {
+  outline: 1px dashed var(--muted);
+  outline-offset: 2px;
+}
+
+.map-pin.is-active {
+  transform: translate(-50%, -100%) scale(1.35);
+  z-index: 5;
+}
+
+.map-pin-label {
+  display: none;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  margin-bottom: 4px;
+  border: 1px solid var(--surface-2);
+}
+
+.map-pin.is-active .map-pin-label,
+.map-pin:hover .map-pin-label {
+  display: block;
+}
+/* ---- END TEMPORARY: demo pin preview -------------------------------- */
 
 /* --------------------------- Tab bar ---------------------------- */
 

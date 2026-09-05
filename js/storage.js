@@ -28,7 +28,8 @@ function emptyState() {
     itinerary: {},       // { [tripId]: [ {id, date, time, type, title, details} ] }
     packing: {},          // { [tripId]: [ {id, text, checked, category} ] }
     budget: {},            // { [tripId]: [ {id, description, amount, currency, category, date} ] }
-    notes: {}                // { [tripId]: [ {id, title, body} ] }  <- confirmations, doc numbers, etc.
+    notes: {},               // { [tripId]: [ {id, title, body} ] }  <- confirmations, doc numbers, etc.
+    ideas: {}                // { [tripId]: [ <idea card - see the Ideas section below> ] }  <- ideation board
   };
 }
 
@@ -41,7 +42,12 @@ function loadState() {
     const parsed = JSON.parse(raw);
     // Merge with emptyState() so that if we add new fields in a future
     // version of the app, old saved data doesn't break anything.
-    return { ...emptyState(), ...parsed };
+    const state = { ...emptyState(), ...parsed };
+    // Bring any ideas saved under an older field shape up to date (see
+    // migrateIdeasInState below), and persist the result so this only
+    // has to run once per trip's data.
+    if (migrateIdeasInState(state)) saveState(state);
+    return state;
   } catch (err) {
     console.error("Saved trip data was corrupted, starting fresh.", err);
     return emptyState();
@@ -85,6 +91,7 @@ function createTrip({ name, destination, startDate, endDate }) {
   state.packing[trip.id] = [];
   state.budget[trip.id] = [];
   state.notes[trip.id] = [];
+  state.ideas[trip.id] = [];
   saveState(state);
   return trip;
 }
@@ -96,6 +103,7 @@ function deleteTrip(tripId) {
   delete state.packing[tripId];
   delete state.budget[tripId];
   delete state.notes[tripId];
+  delete state.ideas[tripId];
   if (state.activeTripId === tripId) {
     state.activeTripId = state.trips.length ? state.trips[0].id : null;
   }
@@ -209,4 +217,169 @@ function deleteNote(tripId, noteId) {
     (n) => n.id !== noteId
   );
   saveState(state);
+}
+
+/* ---------------------------- Ideas ------------------------------- */
+// The ideation board: candidate things to do, before they're scheduled
+// into the real itinerary. Card shape is finalized in
+// product-decisions.md - keep this in sync with that doc if it changes.
+//
+// A card's column on the kanban board (The Ideas / The Plan / The
+// Itinerary) is never stored directly - it's always worked out from
+// `selected` and `finalized` (see columnKeyForIdea() in app.js), the
+// same way currentTab/ideaFilters in app.js are kept out of storage
+// because they're just a way of LOOKING at data, not the data itself.
+
+// activityType and style are both fixed lists (per product-decisions.md).
+// Defined once here, as { value, label } pairs, so app.js can build
+// <select> options and render pill labels from the same source instead
+// of typing the label strings out twice and letting them drift apart.
+const ACTIVITY_TYPES = [
+  { value: "land", label: "Land Activities" },
+  { value: "water", label: "Water & Diving" },
+  { value: "historical", label: "Historical & Cultural" },
+  { value: "food", label: "Food & Wine" },
+  { value: "exploring", label: "Exploring & Sightseeing" },
+  { value: "other", label: "Other" }
+];
+
+const IDEA_STYLES = [
+  { value: "guided", label: "Guided" },
+  { value: "self_guided", label: "Self-guided" },
+  { value: "official_route", label: "Official route" },
+  { value: "casual", label: "Casual" },
+  { value: "none", label: "None/not applicable" }
+];
+
+function getIdeas(tripId) {
+  const state = loadState();
+  return state.ideas[tripId] || [];
+}
+
+// `input` carries whatever the user typed into the add-idea form -
+// title, description, link, region, activityType, style, location's
+// placeName, and optionally urgent/urgencyNotes/reservationNeeded/
+// reserved/confirmationInfo (a card can start out already urgent or
+// already reserved - see the Milan "Last Supper" case in
+// product-decisions.md). Anything not passed in falls back to a
+// sensible default here (not urgent, no reservation needed, not yet
+// selected, geocode still pending), so app.js never has to remember to
+// set every field by hand every time it adds a card.
+//
+// `urgent` and `reserved` are only meaningful when a reservation is
+// actually needed at all, so both are forced back to false here if
+// `reservationNeeded` is false - even if the form somehow sent true for
+// either. That keeps "urgent with no reservation needed" and "reserved
+// with no reservation needed" from ever existing as real states.
+function addIdea(tripId, input) {
+  const state = loadState();
+  if (!state.ideas[tripId]) state.ideas[tripId] = [];
+
+  const rawLocation = input.location || {};
+  const reservationNeeded = input.reservationNeeded || false;
+
+  const idea = {
+    id: makeId(),
+    title: input.title || "",
+    description: input.description || "",
+    link: input.link || "",
+    region: input.region || "",
+    activityType: input.activityType || "other",
+    style: input.style || "none",
+    urgent: reservationNeeded ? (input.urgent || false) : false,
+    urgencyNotes: input.urgencyNotes || "",
+    reservationNeeded,
+    reserved: reservationNeeded ? (input.reserved || false) : false,
+    // Free-text place to paste a confirmation #, phone number, pickup
+    // instructions, etc. - so it's easy to find while traveling instead
+    // of hunting through email folders. See product-decisions.md.
+    confirmationInfo: input.confirmationInfo || "",
+    selected: input.selected || false,
+    // A brand new idea always starts outside The Itinerary, even if
+    // it's already reserved (the Milan case) - moving it into The
+    // Itinerary is still a deliberate drag/click, same as selecting it
+    // into The Plan at all.
+    finalized: false,
+    location: {
+      placeName: rawLocation.placeName || "",
+      lat: null,
+      lng: null,
+      geocodeStatus: "pending"
+    },
+    createdAt: new Date().toISOString()
+  };
+
+  state.ideas[tripId].push(idea);
+  saveState(state);
+  return idea;
+}
+
+// General-purpose edit for everything on a card EXCEPT location - e.g.
+// updateIdea(tripId, id, { reserved: true }) or
+// updateIdea(tripId, id, { urgent: true, urgencyNotes: "Sells out fast" }).
+//
+// Why location is excluded: this does a shallow merge with
+// Object.assign(idea, updates). That's fine for flat fields, but if you
+// passed a partial location object through here - say
+// { location: { placeName: "..." } } - it would REPLACE the whole
+// location object and silently wipe out lat/lng that a geocode lookup
+// already found. Use setIdeaLocation() below for anything touching
+// location instead, so lat/lng/geocodeStatus/placeName can each be
+// updated independently without clobbering the others.
+function updateIdea(tripId, ideaId, updates) {
+  const state = loadState();
+  const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
+  if (idea) Object.assign(idea, updates);
+  saveState(state);
+}
+
+// Dedicated setter for the location sub-object. Pass only what changed,
+// e.g. setIdeaLocation(tripId, id, { lat: -33.9, lng: 18.4, geocodeStatus: "success" })
+// after a Nominatim lookup succeeds, without touching placeName.
+function setIdeaLocation(tripId, ideaId, locationUpdates) {
+  const state = loadState();
+  const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
+  if (idea) idea.location = { ...idea.location, ...locationUpdates };
+  saveState(state);
+}
+
+function deleteIdea(tripId, ideaId) {
+  const state = loadState();
+  state.ideas[tripId] = (state.ideas[tripId] || []).filter(
+    (i) => i.id !== ideaId
+  );
+  saveState(state);
+}
+
+// One-time migration: earlier versions of this app stored a single
+// "bookingStatus" field (not_required / needed / booked) on each idea
+// instead of the current reservationNeeded/reserved/finalized fields.
+// This converts any idea it finds in the old shape the first time it's
+// loaded, so existing trip data doesn't just disappear when the fields
+// change underneath it. Called automatically from loadState() - nothing
+// else needs to call this directly.
+function migrateIdeasInState(state) {
+  let changed = false;
+  Object.keys(state.ideas || {}).forEach((tripId) => {
+    state.ideas[tripId] = (state.ideas[tripId] || []).map((idea) => {
+      if (idea.reservationNeeded !== undefined) return idea; // already migrated
+      changed = true;
+      const reservationNeeded = !!idea.bookingStatus && idea.bookingStatus !== "not_required";
+      const reserved = idea.bookingStatus === "booked";
+      const migrated = {
+        ...idea,
+        reservationNeeded,
+        reserved,
+        confirmationInfo: idea.confirmationInfo || "",
+        // Old "Booked" cards land in the new Itinerary column; old
+        // "Decided" cards land in The Plan - matches how they already
+        // looked before this migration ran.
+        finalized: reserved,
+        urgent: !!idea.urgent && reservationNeeded
+      };
+      delete migrated.bookingStatus;
+      return migrated;
+    });
+  });
+  return changed;
 }
