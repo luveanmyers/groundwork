@@ -162,6 +162,29 @@ function settingsIconSvg(cls) {
   return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 }
 
+/* SetOut brand lockup - "Set" [trail mark] "Out", used only on the Home
+   screen header (every other header shows its own screen title, not
+   the brand name - see product-decisions.md). Reversed (light-on-dark)
+   colors, since the app background is dark. See the brand spec for
+   the source geometry - do not hand-edit the dot positions/sizes. */
+function brandLockupSvg() {
+  return `<span>Set</span><svg width="51" height="20" viewBox="0 0 164 64" fill="none" aria-hidden="true"><rect x="2" y="38" width="20" height="20" rx="3" fill="#fbfaf7"/><circle cx="40" cy="42" r="3.6" fill="#fbfaf7"/><circle cx="60" cy="26" r="3" fill="#ef8b55"/><circle cx="78" cy="46" r="4.6" fill="#ef8b55"/><circle cx="102" cy="22" r="4" fill="#ef8b55"/><circle cx="126" cy="40" r="5.4" fill="#ef8b55"/><circle cx="152" cy="18" r="4.6" fill="#ef8b55"/></svg><span>Out</span>`;
+}
+
+/* Shared sub-page header: the lockup (tap = go Home) stacked with this
+   screen's own title on the left, hamburger menu alone on the right.
+   Every header except Home's is built through this - see
+   product-decisions.md for why Home is the one exception. */
+function subpageHeaderHtml(titleHtml) {
+  return `
+    <div class="header-left">
+      <div class="brand-lockup" onclick="goHome()" role="button" tabindex="0" aria-label="SetOut - go to Home">${brandLockupSvg()}</div>
+      ${titleHtml}
+    </div>
+    ${menuButtonHtml()}
+  `;
+}
+
 /* ----------------------------- Hamburger menu --------------------------- */
 // Shown in the header of every screen except Home (whose bento tiles
 // already ARE the navigation - a menu there would just duplicate
@@ -174,7 +197,6 @@ function menuButtonHtml() {
   const dropdown = isMenuOpen
     ? `
       <div class="menu-dropdown">
-        <div class="menu-item" onclick="event.stopPropagation(); goHome()">${homeIconSvg()} Home</div>
         <div class="menu-item" onclick="event.stopPropagation(); goToScreen('tripsList')">${tripsIconSvg()} My Trips</div>
         <div class="menu-item" onclick="event.stopPropagation(); goToScreen('newTrip')">${plusIconSvg()} Start a New Trip</div>
         <div class="menu-item muted" title="Coming soon">${dashboardIconSvg()} Dashboard</div>
@@ -219,7 +241,7 @@ function renderHomeScreen() {
 
   appRoot().innerHTML = `
     <header class="app-header">
-      <h1>Groundwork</h1>
+      <h1 class="brand-lockup" onclick="goHome()" aria-label="SetOut">${brandLockupSvg()}</h1>
     </header>
     <main class="screen">
       ${banner}
@@ -277,8 +299,7 @@ function renderTripsListScreen() {
 
   appRoot().innerHTML = `
     <header class="app-header">
-      ${menuButtonHtml()}
-      <h1>My Trips</h1>
+      ${subpageHeaderHtml('<h1 class="page-title">My Trips</h1>')}
     </header>
     <main class="screen">
       ${trips.length ? tripRows : `<p class="muted empty-state">No trips yet. <a href="#" onclick="event.preventDefault(); goToScreen('newTrip')">Start your first one</a> - everything you enter is stored only on this phone.</p>`}
@@ -293,8 +314,7 @@ function renderTripsListScreen() {
 function renderNewTripScreen() {
   appRoot().innerHTML = `
     <header class="app-header">
-      ${menuButtonHtml()}
-      <h1>New Trip</h1>
+      ${subpageHeaderHtml('<h1 class="page-title">New Trip</h1>')}
     </header>
     <main class="screen">
       <form class="card form" onsubmit="handleCreateTrip(event)">
@@ -360,11 +380,7 @@ function confirmDeleteTrip(tripId) {
 function renderTripScreen(trip) {
   appRoot().innerHTML = `
     <header class="app-header">
-      ${menuButtonHtml()}
-      <div>
-        <h1>${escapeHtml(trip.name)}</h1>
-        <div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>
-      </div>
+      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>`)}
     </header>
     <main class="screen" id="tab-content"></main>
     <nav class="tab-bar">

@@ -54,9 +54,10 @@ html, body {
 
 .app-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
-  padding: 18px 16px 10px;
+  padding: 16px 16px 12px;
   position: sticky;
   top: 0;
   background: var(--bg);
@@ -66,6 +67,50 @@ html, body {
 .app-header h1 {
   font-size: 1.25rem;
   margin: 0;
+}
+
+/* Left-hand cluster on every sub-page header: the SetOut lockup
+   (tap = go Home) with the screen's own title stacked below it. Home
+   screen doesn't use this - it just shows the lockup alone. See
+   subpageHeaderHtml()/brandLockupSvg() in app.js. */
+.app-header .header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.app-header .page-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+  /* Placeholder look for now - real type treatment is a design-
+     language-pass decision, not made here. This only proves position. */
+}
+.app-header .icon-btn {
+  flex: none;
+}
+
+/* SetOut brand lockup - see app.js's brandLockupSvg(). Reversed
+   (light-on-dark) colors and the Bricolage Grotesque font are scoped
+   to just these two spans, not the app's base font - the wider
+   typography decision is still on hold until the design-language
+   pass. Used standalone as an <h1> on Home, and inside .header-left
+   as a plain <div> everywhere else (the page title takes the <h1>
+   role there instead). */
+.app-header .brand-lockup {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.app-header .brand-lockup span {
+  font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+.app-header .brand-lockup svg {
+  margin: 0 3px;
+  flex: none;
 }
 
 .screen {

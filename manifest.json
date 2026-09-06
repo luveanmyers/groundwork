@@ -1,6 +1,6 @@
 {
-  "name": "Groundwork",
-  "short_name": "Groundwork",
+  "name": "SetOut",
+  "short_name": "SetOut",
   "description": "Personal offline-first trip planning app",
   "start_url": "./index.html",
   "scope": "./",

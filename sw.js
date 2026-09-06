@@ -12,7 +12,7 @@
   instead of a stale cached copy.
 */
 
-const CACHE_NAME = "groundwork-v1";
+const CACHE_NAME = "setout-v1";
 
 // The "app shell" - everything needed to run the app with no network at all.
 // Your actual trip DATA lives in localStorage (see storage.js), not here;
@@ -25,7 +25,8 @@ const APP_SHELL = [
   "./js/storage.js",
   "./js/app.js",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/favicon-32.png"
 ];
 
 // On install: download and cache every file in APP_SHELL.
