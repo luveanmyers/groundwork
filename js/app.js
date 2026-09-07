@@ -535,10 +535,42 @@ function ideaFormHtml(trip) {
       </div>
       <div class="row">
         <label>Category
-          <select name="activityType">${activityTypeOptionsHtml()}</select>
+          <select name="activityType" onchange="handleAddFormActivityTypeChange(this)">${activityTypeOptionsHtml()}</select>
         </label>
         <label>Style
           <select name="style">${ideaStyleOptionsHtml()}</select>
+        </label>
+      </div>
+      <div class="row" data-activity-fields="flight,transport" style="display:none">
+        <label>From
+          <input name="from" type="text" placeholder="e.g. JFK or Cape Town" />
+        </label>
+        <label>To
+          <input name="to" type="text" placeholder="e.g. CPT or Kruger" />
+        </label>
+      </div>
+      <div class="row" data-activity-fields="flight,transport" style="display:none">
+        <label>Departure date
+          <input name="departureDate" type="date" />
+        </label>
+        <label>Departure time
+          <input name="departureTime" type="time" />
+        </label>
+      </div>
+      <div class="row" data-activity-fields="flight,transport" style="display:none">
+        <label>Arrival date
+          <input name="arrivalDate" type="date" />
+        </label>
+        <label>Arrival time
+          <input name="arrivalTime" type="time" />
+        </label>
+      </div>
+      <div class="row" data-activity-fields="lodging" style="display:none">
+        <label>Check-in date
+          <input name="checkInDate" type="date" />
+        </label>
+        <label>Check-out date
+          <input name="checkOutDate" type="date" />
         </label>
       </div>
       <label class="form-checkbox-row">
@@ -580,6 +612,22 @@ function handleAddFormReservationToggle(checkbox) {
   [form.urgencyNotes, form.confirmationInfo].forEach((el) => {
     el.disabled = !enabled;
     if (!enabled) el.value = "";
+  });
+}
+
+// Shows only the logistics fields relevant to the selected Category -
+// Flight/Transport share one set (From/To + departure/arrival date+time),
+// Lodging gets its own (check-in/check-out date). Fields for a
+// different category stay in the DOM (hidden, not removed) so nothing
+// typed into one group is lost if you flip Category back and forth
+// before submitting - same "don't discard what's typed" spirit as the
+// reservation-toggle fields above, just keyed off a select instead of
+// a checkbox.
+function handleAddFormActivityTypeChange(select) {
+  const form = select.form;
+  form.querySelectorAll("[data-activity-fields]").forEach((group) => {
+    const relevantTypes = group.dataset.activityFields.split(",");
+    group.style.display = relevantTypes.includes(select.value) ? "" : "none";
   });
 }
 
@@ -702,6 +750,66 @@ function normalizedLinkHref(link) {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+// Type-specific logistics fields, editable inline like every other
+// field in the card - shown only when Category is Flight/Transport
+// (shared From/To + departure/arrival date+time) or Lodging
+// (check-in/check-out date only, no time). Field labels match the
+// confirmed calendar-mockup.html edit popover exactly, so the same
+// fields look the same wherever they're edited. Every other category
+// renders nothing here - storage.js already keeps these fields as
+// empty strings for non-logistics cards, so there's nothing to show.
+function logisticsFieldsHtml(trip, idea) {
+  if (idea.activityType === "flight" || idea.activityType === "transport") {
+    return `
+      <div class="idea-edit-row">
+        <label class="idea-edit-field">
+          <span>From</span>
+          <input type="text" placeholder="e.g. JFK or Cape Town" value="${escapeHtml(idea.from)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'from', this.value.trim())" />
+        </label>
+        <label class="idea-edit-field">
+          <span>To</span>
+          <input type="text" placeholder="e.g. CPT or Kruger" value="${escapeHtml(idea.to)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'to', this.value.trim())" />
+        </label>
+      </div>
+      <div class="idea-edit-row">
+        <label class="idea-edit-field">
+          <span>Departure date</span>
+          <input type="date" value="${escapeHtml(idea.departureDate)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'departureDate', this.value)" />
+        </label>
+        <label class="idea-edit-field">
+          <span>Departure time</span>
+          <input type="time" value="${escapeHtml(idea.departureTime)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'departureTime', this.value)" />
+        </label>
+      </div>
+      <div class="idea-edit-row">
+        <label class="idea-edit-field">
+          <span>Arrival date</span>
+          <input type="date" value="${escapeHtml(idea.arrivalDate)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'arrivalDate', this.value)" />
+        </label>
+        <label class="idea-edit-field">
+          <span>Arrival time</span>
+          <input type="time" value="${escapeHtml(idea.arrivalTime)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'arrivalTime', this.value)" />
+        </label>
+      </div>
+    `;
+  }
+  if (idea.activityType === "lodging") {
+    return `
+      <div class="idea-edit-row">
+        <label class="idea-edit-field">
+          <span>Check-in date</span>
+          <input type="date" value="${escapeHtml(idea.checkInDate)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'checkInDate', this.value)" />
+        </label>
+        <label class="idea-edit-field">
+          <span>Check-out date</span>
+          <input type="date" value="${escapeHtml(idea.checkOutDate)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'checkOutDate', this.value)" />
+        </label>
+      </div>
+    `;
+  }
+  return "";
+}
+
 // One card. See product-decisions.md for what each field means and
 // mockup/kanban-mockup.html (now retired) for how this layout was
 // reviewed before being built for real.
@@ -764,6 +872,7 @@ function kanbanCardHtml(trip, idea, columnKey) {
               <select onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'style', this.value)">${ideaStyleOptionsHtml(idea.style)}</select>
             </label>
           </div>
+          ${logisticsFieldsHtml(trip, idea)}
           <label class="idea-edit-field">
             <span>Region</span>
             <input type="text" placeholder="e.g. Cape Town" value="${escapeHtml(idea.region)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'region', this.value.trim())" />
@@ -948,7 +1057,20 @@ function handleAddIdea(event, tripId) {
     confirmationInfo: form.confirmationInfo.value.trim(),
     urgent: form.urgent.checked,
     urgencyNotes: form.urgencyNotes.value.trim(),
-    location: { placeName: form.location.value.trim() }
+    location: { placeName: form.location.value.trim() },
+    // Only meaningful when Category is Flight/Transport/Lodging - see
+    // handleAddFormActivityTypeChange above for how the form shows/hides
+    // these. Reading them unconditionally here is safe either way: a
+    // hidden group's inputs are still just empty strings, and addIdea()
+    // already defaults every one of these to "" if not passed.
+    from: form.from.value.trim(),
+    to: form.to.value.trim(),
+    departureDate: form.departureDate.value,
+    departureTime: form.departureTime.value,
+    arrivalDate: form.arrivalDate.value,
+    arrivalTime: form.arrivalTime.value,
+    checkInDate: form.checkInDate.value,
+    checkOutDate: form.checkOutDate.value
   });
   isAddIdeaFormOpen = false;
   renderTabContent(getActiveTrip());
