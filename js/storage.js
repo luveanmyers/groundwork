@@ -240,6 +240,9 @@ const ACTIVITY_TYPES = [
   { value: "historical", label: "Historical & Cultural" },
   { value: "food", label: "Food & Wine" },
   { value: "exploring", label: "Exploring & Sightseeing" },
+  { value: "flight", label: "Flight" },
+  { value: "lodging", label: "Lodging" },
+  { value: "transport", label: "Transport (train, car, ferry, etc.)" },
   { value: "other", label: "Other" }
 ];
 
@@ -294,6 +297,30 @@ function addIdea(tripId, input) {
     // instructions, etc. - so it's easy to find while traveling instead
     // of hunting through email folders. See product-decisions.md.
     confirmationInfo: input.confirmationInfo || "",
+    // Type-specific logistics fields. Only meaningful when activityType is
+    // "flight", "transport", or "lodging" - left as empty strings for
+    // every other type. Flight/transport use a separate date+time for
+    // departure and arrival; a real departure date/time is what makes a
+    // flight card eligible for auto-scheduling onto the calendar (see
+    // product-decisions.md).
+    from: input.from || "",
+    to: input.to || "",
+    departureDate: input.departureDate || "",
+    departureTime: input.departureTime || "",
+    arrivalDate: input.arrivalDate || "",
+    arrivalTime: input.arrivalTime || "",
+    // Lodging uses a date range instead of a single date/time.
+    checkInDate: input.checkInDate || "",
+    checkOutDate: input.checkOutDate || "",
+    // Where this card sits on the Building-mode calendar, once it has a
+    // spot there - either because it auto-placed itself (a confirmed
+    // departure or check-in date) or because it was manually dragged into
+    // a slot. slot is one of morning/midday/afternoon/evening/allday/
+    // lodging. Both stay null until the card is actually placed.
+    scheduled: {
+      date: (input.scheduled && input.scheduled.date) || null,
+      slot: (input.scheduled && input.scheduled.slot) || null
+    },
     selected: input.selected || false,
     // A brand new idea always starts outside The Itinerary, even if
     // it's already reserved (the Milan case) - moving it into The
@@ -362,22 +389,49 @@ function migrateIdeasInState(state) {
   let changed = false;
   Object.keys(state.ideas || {}).forEach((tripId) => {
     state.ideas[tripId] = (state.ideas[tripId] || []).map((idea) => {
-      if (idea.reservationNeeded !== undefined) return idea; // already migrated
-      changed = true;
-      const reservationNeeded = !!idea.bookingStatus && idea.bookingStatus !== "not_required";
-      const reserved = idea.bookingStatus === "booked";
-      const migrated = {
-        ...idea,
-        reservationNeeded,
-        reserved,
-        confirmationInfo: idea.confirmationInfo || "",
-        // Old "Booked" cards land in the new Itinerary column; old
-        // "Decided" cards land in The Plan - matches how they already
-        // looked before this migration ran.
-        finalized: reserved,
-        urgent: !!idea.urgent && reservationNeeded
-      };
-      delete migrated.bookingStatus;
+      let migrated = idea;
+
+      // Migration 1: earlier versions stored a single "bookingStatus" enum
+      // (not_required / needed / booked) instead of the current
+      // reservationNeeded/reserved/finalized fields.
+      if (migrated.reservationNeeded === undefined) {
+        changed = true;
+        const reservationNeeded = !!migrated.bookingStatus && migrated.bookingStatus !== "not_required";
+        const reserved = migrated.bookingStatus === "booked";
+        migrated = {
+          ...migrated,
+          reservationNeeded,
+          reserved,
+          confirmationInfo: migrated.confirmationInfo || "",
+          // Old "Booked" cards land in the new Itinerary column; old
+          // "Decided" cards land in The Plan - matches how they already
+          // looked before this migration ran.
+          finalized: reserved,
+          urgent: !!migrated.urgent && reservationNeeded
+        };
+        delete migrated.bookingStatus;
+      }
+
+      // Migration 2: cards saved before Flight/Lodging/Transport existed
+      // don't have the logistics fields or the calendar `scheduled` slot
+      // yet. Backfill them with empty/null defaults so older trips don't
+      // break when the rest of the app starts expecting these fields.
+      if (migrated.scheduled === undefined) {
+        changed = true;
+        migrated = {
+          ...migrated,
+          from: migrated.from || "",
+          to: migrated.to || "",
+          departureDate: migrated.departureDate || "",
+          departureTime: migrated.departureTime || "",
+          arrivalDate: migrated.arrivalDate || "",
+          arrivalTime: migrated.arrivalTime || "",
+          checkInDate: migrated.checkInDate || "",
+          checkOutDate: migrated.checkOutDate || "",
+          scheduled: { date: null, slot: null }
+        };
+      }
+
       return migrated;
     });
   });
