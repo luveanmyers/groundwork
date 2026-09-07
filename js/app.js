@@ -162,13 +162,36 @@ function settingsIconSvg(cls) {
   return `<svg class="${cls || ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 }
 
-/* SetOut brand lockup - "Set" [trail mark] "Out", used only on the Home
-   screen header (every other header shows its own screen title, not
-   the brand name - see product-decisions.md). Reversed (light-on-dark)
-   colors, since the app background is dark. See the brand spec for
-   the source geometry - do not hand-edit the dot positions/sizes. */
-function brandLockupSvg() {
-  return `<span>Set</span><svg width="51" height="20" viewBox="0 0 164 64" fill="none" aria-hidden="true"><rect x="2" y="38" width="20" height="20" rx="3" fill="#fbfaf7"/><circle cx="40" cy="42" r="3.6" fill="#fbfaf7"/><circle cx="60" cy="26" r="3" fill="#ef8b55"/><circle cx="78" cy="46" r="4.6" fill="#ef8b55"/><circle cx="102" cy="22" r="4" fill="#ef8b55"/><circle cx="126" cy="40" r="5.4" fill="#ef8b55"/><circle cx="152" cy="18" r="4.6" fill="#ef8b55"/></svg><span>Out</span>`;
+/* SetOut brand lockup - "Set" [trail mark] "Out". Full version (with
+   the connector mark) on Home only; every other header uses the
+   compact text-only version (compact=true) - see product-decisions.md's
+   "SetOut wordmark, logo, and favicon" section for why. "Set" and "Out"
+   deliberately use different fonts/colors (see the .word-set/.word-out
+   CSS rules), independent of the app's page-title font. */
+function brandLockupSvg(compact) {
+  if (compact) {
+    return `<span class="word-set">Set</span><span class="word-out">Out</span>`;
+  }
+  return `<span class="word-set">Set</span><svg width="51" height="20" viewBox="0 0 164 64" fill="none" aria-hidden="true"><rect x="2" y="38" width="20" height="20" rx="3" fill="var(--ink)"/><circle cx="40" cy="42" r="3.6" fill="var(--ink)"/><circle cx="60" cy="26" r="3" fill="var(--accent-vivid)"/><circle cx="78" cy="46" r="4.6" fill="var(--accent-vivid)"/><circle cx="102" cy="22" r="4" fill="var(--accent-vivid)"/><circle cx="126" cy="40" r="5.4" fill="var(--accent-vivid)"/><circle cx="152" cy="18" r="4.6" fill="var(--accent-vivid)"/></svg><span class="word-out">Out</span>`;
+}
+
+/* Activity-type icons for the ideas board pills - line-icon set from
+   the confirmed 2026-09-07 style pass (see product-decisions.md).
+   Flight/Lodging/Transport don't have a designed icon yet (added to
+   ACTIVITY_TYPES after that pass) - falls back to no icon for those
+   three rather than guessing a design that hasn't been confirmed. */
+const ACTIVITY_TYPE_ICON_IDS = {
+  land: "i-land",
+  water: "i-water",
+  historical: "i-culture",
+  food: "i-food",
+  exploring: "i-explore",
+  other: "i-other"
+};
+function activityTypeIconHtml(value) {
+  const id = ACTIVITY_TYPE_ICON_IDS[value];
+  if (!id) return "";
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#${id}"/></svg>`;
 }
 
 /* Shared sub-page header: the lockup (tap = go Home) stacked with this
@@ -178,7 +201,7 @@ function brandLockupSvg() {
 function subpageHeaderHtml(titleHtml) {
   return `
     <div class="header-left">
-      <div class="brand-lockup" onclick="goHome()" role="button" tabindex="0" aria-label="SetOut - go to Home">${brandLockupSvg()}</div>
+      <div class="brand-lockup" onclick="goHome()" role="button" tabindex="0" aria-label="SetOut - go to Home">${brandLockupSvg(true)}</div>
       ${titleHtml}
     </div>
     ${menuButtonHtml()}
@@ -856,7 +879,7 @@ function kanbanCardHtml(trip, idea, columnKey) {
 
       <div class="kanban-card-collapsed-meta">
         ${idea.region ? `<span class="kanban-card-region">&#128205; ${escapeHtml(idea.region)}</span>` : ""}
-        <span class="pill pill-activity">${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+        <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
         ${isReserved ? `<span class="badge-flag badge-reserved">&#10003; Reserved</span>` : ""}
       </div>
 
@@ -1283,7 +1306,7 @@ function mapPlottedCardsHtml(plotted) {
         <span class="maplist-stage-dot" style="background:var(--stage-${columnKeyForIdea(idea)});"></span>
       </div>
       <div class="maplist-card-pills">
-        <span class="pill pill-activity">${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+        <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
         <span class="pill pill-style">${escapeHtml(ideaStyleLabel(idea.style))}</span>
         ${idea.urgent ? `<span class="badge-flag badge-urgent">Urgent</span>` : ""}
         ${idea.reservationNeeded && !idea.reserved ? `<span class="badge-flag badge-reservation-needed">Needs reservation</span>` : ""}
@@ -1314,7 +1337,7 @@ function mapDemoPlottedCardsHtml(demoPlotted) {
         <span class="maplist-stage-dot" style="background:var(--stage-${columnKeyForIdea(idea)});"></span>
       </div>
       <div class="maplist-card-pills">
-        <span class="pill pill-activity">${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+        <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
         <span class="pill pill-style">${escapeHtml(ideaStyleLabel(idea.style))}</span>
         ${idea.urgent ? `<span class="badge-flag badge-urgent">Urgent</span>` : ""}
         ${idea.reservationNeeded && !idea.reserved ? `<span class="badge-flag badge-reservation-needed">Needs reservation</span>` : ""}

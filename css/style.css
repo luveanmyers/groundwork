@@ -6,15 +6,35 @@
 */
 
 :root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-2: #273449;
-  --text: #f1f5f9;
-  --muted: #94a3b8;
-  --accent: #38bdf8;
-  --accent-2: #fbbf24;
-  --danger: #f87171;
-  --radius: 14px;
+  /* SetOut design tokens - light/off-white "warm" palette, confirmed
+     2026-09-07 (see product-decisions.md's "SetOut wordmark, logo, and
+     favicon" section). Replaces the earlier dark-mode placeholder
+     defaults across the whole app, not just the lockup/favicon. */
+  --bg: #FAF7F4;
+  --surface: #FFFFFF;
+  --surface-2: #F4EEEA;
+  --border: #E8E0D9;
+  --ink: #312F3B;
+  --ink-soft: #6F6971;
+  --ink-faint: #A79EA6;
+  --accent: #66719E;
+  --accent-soft: #E5E8F1;
+  --accent-vivid: #4459AB;
+  --accent-2: #4459AB;
+  --tint: #C9BAB4;
+  --tint-soft: #F4E9E4;
+  --danger: #D65B4A;
+  --radius: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(49, 47, 59, .06), 0 10px 24px -16px rgba(49, 47, 59, .22);
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* --accent-2 and --danger are NOT part of the confirmed design pass
+     (that covered bg/surface/ink/accent/tint plus the logo only) - these
+     are a best-fit placeholder to keep the palette coherent, not a
+     locked decision. Worth a direct look before treating as final. */
 
   /* Stage colors (kanban column), used on the Ideas-board Map view.
      Deliberately NOT reusing --accent/--accent-2/--danger, since those
@@ -39,11 +59,17 @@ html, body {
   padding: 0;
   height: 100%;
   background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-body);
   /* Respect the iPhone's notch / home indicator when installed full-screen */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  margin: 0;
 }
 
 #app {
@@ -104,9 +130,17 @@ html, body {
   cursor: pointer;
 }
 .app-header .brand-lockup span {
-  font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.01em;
+}
+.app-header .brand-lockup .word-set {
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 800;
+  color: var(--ink);
+}
+.app-header .brand-lockup .word-out {
+  font-family: "Yeseva One", serif;
+  font-weight: 400;
+  color: var(--accent-vivid);
 }
 .app-header .brand-lockup svg {
   margin: 0 3px;
@@ -121,7 +155,7 @@ html, body {
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .small {
@@ -165,7 +199,7 @@ html, body {
 
 .note-body {
   white-space: pre-wrap;
-  color: var(--muted);
+  color: var(--ink-soft);
   margin-top: 4px;
 }
 
@@ -178,7 +212,7 @@ html, body {
 .icon-btn {
   background: none;
   border: none;
-  color: var(--text);
+  color: var(--ink);
   font-size: 1.3rem;
   line-height: 1;
   padding: 4px 8px;
@@ -207,7 +241,7 @@ html, body {
 
 .checked-text {
   text-decoration: line-through;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .check-row input[type="checkbox"] {
@@ -235,7 +269,7 @@ html, body {
   flex-direction: column;
   gap: 4px;
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   margin-bottom: 10px;
 }
 
@@ -243,10 +277,10 @@ html, body {
 .form select,
 .form textarea {
   background: var(--surface-2);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
-  color: var(--text);
+  color: var(--ink);
   font-size: 1rem;
   font-family: inherit;
 }
@@ -324,7 +358,7 @@ button.primary:active {
 }
 
 .kanban-column-count {
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.8rem;
 }
 
@@ -342,7 +376,7 @@ button.primary:active {
 }
 
 .kanban-dropzone.drag-over {
-  background: rgba(56, 189, 248, 0.08);
+  background: rgba(102, 113, 158, 0.08);
   outline-color: var(--accent);
 }
 
@@ -352,7 +386,7 @@ button.primary:active {
   padding: 12px 14px;
   margin-bottom: 10px;
   cursor: grab;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
 }
 
 .kanban-card[draggable="true"]:active {
@@ -392,7 +426,7 @@ button.primary:active {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(56, 189, 248, 0.16);
+  background: rgba(102, 113, 158, 0.16);
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
@@ -401,13 +435,13 @@ button.primary:active {
 }
 
 .kanban-card-title-row:hover .kanban-chevron {
-  background: rgba(56, 189, 248, 0.32);
+  background: rgba(102, 113, 158, 0.32);
 }
 
 .kanban-card-title {
   font-weight: 600;
   font-size: 0.95rem;
-  color: var(--text);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -438,7 +472,7 @@ button.primary:active {
 }
 
 .kanban-move-btn:hover {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(102, 113, 158, 0.12);
 }
 
 .kanban-card-collapsed-meta {
@@ -475,23 +509,31 @@ button.primary:active {
 }
 
 .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.72rem;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   white-space: nowrap;
   font-weight: 600;
 }
+.pill svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
 
 .pill-activity {
-  background: rgba(56, 189, 248, 0.18);
+  background: var(--tint-soft);
   color: var(--accent);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid var(--tint);
 }
 
 .pill-style {
-  background: rgba(251, 191, 36, 0.14);
+  background: rgba(68, 89, 171, 0.14);
   color: var(--accent-2);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  border: 1px solid rgba(68, 89, 171, 0.3);
 }
 
 /* Small read-only status badges shown in the card header/collapsed
@@ -514,15 +556,15 @@ button.primary:active {
 }
 
 .badge-reservation-needed {
-  background: rgba(251, 191, 36, 0.18);
+  background: rgba(68, 89, 171, 0.18);
   color: var(--accent-2);
-  border: 1px solid rgba(251, 191, 36, 0.35);
+  border: 1px solid rgba(68, 89, 171, 0.35);
 }
 
 .badge-reserved {
-  background: rgba(56, 189, 248, 0.18);
+  background: rgba(102, 113, 158, 0.18);
   color: var(--accent);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid rgba(102, 113, 158, 0.35);
 }
 
 .urgency-note {
@@ -532,7 +574,7 @@ button.primary:active {
 }
 
 .kanban-card-region {
-  color: var(--text);
+  color: var(--ink);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -572,8 +614,8 @@ button.primary:active {
 
 .toggle-pill {
   background: var(--surface-2);
-  color: var(--muted);
-  border: 1px solid #334155;
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 0.78rem;
   padding: 5px 12px;
@@ -582,9 +624,9 @@ button.primary:active {
 }
 
 .toggle-pill.is-on {
-  background: rgba(56, 189, 248, 0.18);
+  background: rgba(102, 113, 158, 0.18);
   color: var(--accent);
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: rgba(102, 113, 158, 0.35);
 }
 
 /* Urgent's toggle button (in the card body) - not the read-only
@@ -602,8 +644,8 @@ button.primary:active {
   padding: 5px 10px;
   border-radius: 999px;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--muted);
+  background: var(--border);
+  color: var(--ink-soft);
 }
 
 .badge-urgent-toggle.is-urgent {
@@ -641,17 +683,17 @@ button.primary:active {
   flex-direction: column;
   gap: 4px;
   font-size: 0.82rem;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .idea-edit-field input,
 .idea-edit-field select,
 .idea-edit-field textarea {
   background: var(--surface-2);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 7px 10px;
-  color: var(--text);
+  color: var(--ink);
   font-size: 0.85rem;
   font-family: inherit;
 }
@@ -684,16 +726,16 @@ button.primary:active {
   flex-direction: column;
   gap: 4px;
   font-size: 0.82rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   margin-top: 10px;
 }
 
 .confirmation-info-field textarea {
   background: var(--surface-2);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  color: var(--text);
+  color: var(--ink);
   font-size: 0.85rem;
   font-family: inherit;
   min-height: 50px;
@@ -771,10 +813,10 @@ button.primary:active {
 
 .idea-filter-bar select {
   background: var(--surface-2);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  color: var(--text);
+  color: var(--ink);
   font-size: 0.85rem;
   font-family: inherit;
 }
@@ -783,7 +825,7 @@ button.primary:active {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -836,7 +878,7 @@ button.primary:active {
 .view-toggle button {
   border: none;
   background: none;
-  color: var(--muted);
+  color: var(--ink-soft);
   font-size: 0.85rem;
   font-weight: 600;
   padding: 7px 16px;
@@ -886,7 +928,7 @@ button.primary:active {
   border-radius: 10px;
   padding: 8px 10px;
   font-size: 0.72rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -921,7 +963,7 @@ button.primary:active {
   bottom: 10px;
   left: 12px;
   font-size: 0.7rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   background: rgba(15, 23, 42, 0.7);
   padding: 4px 8px;
   border-radius: 6px;
@@ -936,7 +978,7 @@ button.primary:active {
   border-radius: var(--radius);
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
 }
 
 .maplist-card-top {
@@ -961,7 +1003,7 @@ button.primary:active {
 
 .maplist-card-region {
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   margin-top: 2px;
 }
 
@@ -982,7 +1024,7 @@ button.primary:active {
 
 .not-on-map h4 {
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin: 0 0 8px;
@@ -1027,7 +1069,7 @@ button.primary:active {
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   cursor: pointer;
 }
 
@@ -1038,14 +1080,14 @@ button.primary:active {
 .demo-pins-banner {
   font-size: 0.75rem;
   color: var(--accent-2);
-  background: rgba(251, 191, 36, 0.12);
+  background: rgba(68, 89, 171, 0.12);
   padding: 3px 9px;
   border-radius: 6px;
 }
 
 .demo-tag {
   font-size: 0.6rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   background: var(--surface-2);
   padding: 1px 5px;
   border-radius: 4px;
@@ -1085,11 +1127,11 @@ button.primary:active {
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   border: 2px solid var(--bg);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(49, 47, 59, 0.18);
 }
 
 .map-pin.is-demo .map-pin-dot {
-  outline: 1px dashed var(--muted);
+  outline: 1px dashed var(--ink-soft);
   outline-offset: 2px;
 }
 
@@ -1101,7 +1143,7 @@ button.primary:active {
 .map-pin-label {
   display: none;
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
   font-size: 0.72rem;
   font-weight: 600;
   padding: 3px 8px;
@@ -1135,7 +1177,7 @@ button.primary:active {
   flex: 1;
   background: none;
   border: none;
-  color: var(--muted);
+  color: var(--ink-soft);
   padding: 12px 4px;
   font-size: 0.8rem;
   cursor: pointer;
@@ -1182,12 +1224,12 @@ button.primary:active {
 }
 .hero-banner.empty {
   border-style: dashed;
-  border-color: var(--muted);
+  border-color: var(--ink-soft);
   text-align: center;
   cursor: default;
 }
 .hero-banner.empty .eyebrow {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .bento-grid {
@@ -1262,13 +1304,13 @@ button.primary:active {
 .menu-dropdown {
   position: absolute;
   top: 38px;
-  left: 0;
+  right: 0;
   background: var(--surface);
   border: 1px solid var(--surface-2);
   border-radius: 12px;
   padding: 6px;
   min-width: 190px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px rgba(49, 47, 59, 0.18);
   z-index: 10;
   text-align: left;
 }
@@ -1280,14 +1322,14 @@ button.primary:active {
   border-radius: 8px;
   font-size: 0.9rem;
   cursor: pointer;
-  color: var(--text);
+  color: var(--ink);
 }
 .menu-dropdown .menu-item:hover {
   background: var(--surface-2);
 }
 .menu-dropdown .menu-item.muted {
   cursor: default;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 .menu-dropdown .menu-item.muted:hover {
   background: none;
