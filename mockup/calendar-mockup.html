@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Groundwork - Building calendar mockup v6</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #273449;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-2: #fbbf24;
+    --danger: #f87171;
+    --transport-warn: #fb923c;
+    --radius: 12px;
+    --lodging: #a78bfa;
+    --flight: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .mockup-banner {
+    background: var(--accent-2);
+    color: #1a1400;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 8px;
+  }
+  .mockup-note {
+    max-width: 1200px;
+    margin: 10px auto 0;
+    padding: 0 16px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .mockup-note.v6 {
+    text-align: left;
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 12px 16px;
+    max-width: 1268px;
+  }
+  .mockup-note.v6 b { color: var(--text); }
+  .layout {
+    display: flex;
+    gap: 16px;
+    max-width: 1300px;
+    margin: 16px auto;
+    padding: 0 16px;
+    align-items: flex-start;
+  }
+
+  .sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px;
+    position: sticky;
+    top: 16px;
+    min-height: 80px;
+  }
+  .sidebar.drag-over { outline: 2px dashed var(--accent); }
+  .sidebar h2 { font-size: 0.9rem; margin: 0 0 4px; }
+  .sidebar .hint { font-size: 0.75rem; color: var(--muted); margin-bottom: 12px; }
+  .idea-card {
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    cursor: grab;
+    font-size: 0.85rem;
+  }
+  .idea-card:active { cursor: grabbing; }
+  .idea-card.dragging { opacity: 0.4; }
+  .idea-card .pill {
+    display: inline-block;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: rgba(56,189,248,0.15);
+    color: var(--accent);
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-bottom: 4px;
+  }
+  .needs-reservation-tag {
+    display: inline-block;
+    font-size: 0.6rem;
+    color: var(--accent-2);
+    background: rgba(251,191,36,0.15);
+    padding: 1px 6px;
+    border-radius: 999px;
+    margin-top: 4px;
+  }
+
+  .calendar {
+    flex: 1;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px;
+    overflow-x: auto;
+  }
+  .week-block { margin-bottom: 20px; }
+  .week-block:last-child { margin-bottom: 0; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: 78px repeat(7, 1fr);
+    grid-template-rows: auto repeat(6, minmax(42px, auto));
+    gap: 5px;
+    min-width: 980px;
+  }
+  .cal-cell {
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+  }
+  .cal-cell.outside-trip {
+    background: transparent;
+    border: 1px dashed var(--surface-2);
+  }
+  .row-label {
+    display: flex;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding-left: 2px;
+  }
+  .day-header {
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 3px 0 6px;
+  }
+  .day-header .dow { display:block; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .day-header.outside-trip { color: var(--surface-2); }
+  .day-header.outside-trip .dow { color: var(--surface-2); }
+
+  .flight-chip {
+    background: rgba(74,222,128,0.15);
+    border: 1px solid var(--flight);
+    color: var(--flight);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-weight: 600;
+    font-size: 0.7rem;
+  }
+
+  .lodging-cell {
+    background: rgba(167,139,250,0.18);
+    border: 1px solid var(--lodging);
+    color: var(--lodging);
+    font-weight: 600;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .lodging-gap {
+    background: rgba(248,113,113,0.12);
+    border: 1px dashed var(--danger);
+    color: var(--danger);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+  .transport-warn {
+    background: rgba(251,146,60,0.15);
+    border: 1px dashed var(--transport-warn);
+    color: var(--transport-warn);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  .slot-cell.drag-over {
+    outline: 2px dashed var(--accent);
+    background: rgba(56,189,248,0.12);
+  }
+  .allday-row-cell.drag-over {
+    outline: 2px dashed var(--accent-2);
+  }
+
+  .placed-card, .allday-bar {
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 5px 6px;
+    font-size: 0.7rem;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    z-index: 2;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .placed-card.demo-collision {
+    cursor: pointer;
+    position: static;
+  }
+  .allday-bar {
+    border-left: 3px solid var(--accent-2);
+    background: rgba(251,191,36,0.12);
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+  .placed-card.dragging, .allday-bar.dragging { opacity: 0.4; }
+  .placed-card .placed-label, .allday-bar-label { overflow: hidden; }
+  .placed-controls { display: flex; gap: 3px; flex-shrink: 0; }
+  .extend-btn, .shrink-btn, .remove-btn {
+    background: var(--surface-2);
+    border: none;
+    color: var(--accent);
+    border-radius: 4px;
+    width: 16px; height: 16px;
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .extend-btn:disabled, .shrink-btn:disabled { opacity: 0.3; cursor: default; }
+  .remove-btn { color: var(--danger); }
+
+  /* ---- v6: auto-scheduled badge, conflict badge, click-to-edit popover ---- */
+  .auto-tag {
+    background: rgba(74,222,128,0.25);
+    color: var(--flight);
+    font-size: 0.56rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 999px;
+    margin-left: 5px;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+  }
+  .lodging-cell .auto-tag { color: var(--lodging); background: rgba(167,139,250,0.28); }
+  .conflict-badge {
+    background: rgba(248,113,113,0.18);
+    color: var(--danger);
+    border: 1px dashed var(--danger);
+    border-radius: 6px;
+    padding: 2px 5px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  [data-popover-type] { cursor: pointer; }
+  [data-popover-type]:hover { filter: brightness(1.18); }
+  .saved-icon { font-size: 0.72rem; }
+  .edit-popover {
+    position: absolute;
+    z-index: 50;
+    width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--surface-2);
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    font-size: 0.8rem;
+  }
+  .edit-popover .popover-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+  .edit-popover .popover-title { font-weight: 700; flex: 1; font-size: 0.85rem; }
+  .edit-popover .popover-close {
+    background: none; border: none; color: var(--muted); font-size: 1.05rem; cursor: pointer; padding: 0 2px; line-height: 1;
+  }
+  .edit-popover .popover-hint { font-size: 0.68rem; color: var(--muted); margin: 4px 0 10px; line-height: 1.4; }
+  .edit-popover label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 8px; }
+  .edit-popover input, .edit-popover textarea {
+    display: block; width: 100%; margin-top: 3px; padding: 6px 8px;
+    border-radius: 6px; border: 1px solid var(--surface-2); background: var(--surface-2);
+    color: var(--text); font-size: 0.76rem; font-family: inherit;
+  }
+  .edit-popover textarea { min-height: 44px; resize: vertical; }
+  .edit-popover .row { display: flex; gap: 8px; }
+  .edit-popover .row > label { flex: 1; }
+  .edit-popover button.primary {
+    width: 100%; background: var(--accent); color: #04121f; border: none;
+    border-radius: 8px; padding: 8px; font-size: 0.76rem; font-weight: 700; cursor: pointer; margin-top: 2px;
+  }
+  .edit-popover button.secondary {
+    width: 100%; background: none; border: 1px dashed var(--muted); color: var(--text);
+    border-radius: 8px; padding: 6px; font-size: 0.7rem; cursor: pointer; margin-top: 6px; margin-bottom: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP v6 - review only. Drag cards onto slots or the All Day row. Click any placed item (including auto-scheduled flights/lodging) to open its edit panel.</div>
+<div class="mockup-note">
+  Fake example trip: Oct 12 (Mon) &ndash; Oct 20 (Tue), spanning two calendar weeks (starts Sunday, like a real month view - days outside the trip are grayed and not droppable). Lodging: The Silo Hotel, Cape Town (Oct 13&ndash;16), then Kruger Safari Lodge (Oct 19&ndash;20) - the gap between them is both "no lodging" AND a region change, so both flags show. Multi-day all-day items (like a multi-day safari) are schedule-only - they do NOT satisfy the lodging requirement, so the red lodging-gap flag still applies underneath them if nothing is booked. All-day items can now stretch across the week boundary (try extending the Kruger card past Oct 17 into Oct 18). Flights are placed by illustrative time-of-day, not a locked cutoff.
+</div>
+<div class="mockup-note v6">
+  <b>New in v6, for review:</b> the flights and lodging below now carry a green/purple <b>AUTO</b> tag - they placed themselves on the calendar because they have a real confirmed date/time from booking, not because anyone dragged them. A brand-new "Cape Town &rarr; Kruger" flight idea now sits in the sidebar tagged <b>Needs reservation</b> - it stays there, manual, until it's actually booked, exactly like any other idea. <b>Every placed item is now clickable</b> (not just dragged) - click a flight, a lodging bar, or any dragged activity to open its edit panel, with fields that match its type (flight fields for a flight, plain confirmation/details for an activity). <b>Save now actually works</b> in this mockup (it stores your edits in memory for the rest of this browser session - reopening the same item shows what you typed; a plain activity also gets a small &#128203; icon next to its label once it has saved details, so you can see something happened even without a real data layer underneath). The Oct 13 midday cell is a deliberate, hand-built example of what a scheduling conflict would look like (a flight and an activity landing in the same slot) - <b>live conflict detection isn't wired up yet</b> for slots you drag into yourself, this is just showing the shape of it. Still open: does the confirmed date always win if you nudge an auto-placed item and then edit its date later, or does your manual placement stick?
+</div>
+
+<div class="layout">
+
+  <div class="sidebar" id="sidebar">
+    <h2>Itinerary Building Blocks</h2>
+    <div class="hint">Cards already moved into The Itinerary kanban column, not yet given a day/slot. Drag one onto the calendar, or drag a placed item back here to unschedule it.</div>
+
+    <div class="idea-card" draggable="true" id="card-cable">
+      <div class="pill">Land</div>
+      <div>Table Mountain cable car</div>
+    </div>
+    <div class="idea-card" draggable="true" id="card-wine">
+      <div class="pill">Food &amp; Wine</div>
+      <div>Stellenbosch wine tasting</div>
+    </div>
+    <div class="idea-card" draggable="true" id="card-district6">
+      <div class="pill">History</div>
+      <div>District Six Museum</div>
+    </div>
+    <div class="idea-card" draggable="true" id="card-boat">
+      <div class="pill">Water</div>
+      <div>Seal Island boat tour</div>
+    </div>
+    <div class="idea-card" draggable="true" id="card-safari">
+      <div class="pill">Exploring</div>
+      <div>Kruger game drive</div>
+    </div>
+    <div class="idea-card" draggable="true" id="card-flight-kruger">
+      <div class="pill">Flight</div>
+      <div>Cape Town &rarr; Kruger</div>
+      <div class="needs-reservation-tag">Needs reservation</div>
+    </div>
+  </div>
+
+  <div class="calendar" id="calendar">
+    <!-- Week 1: Oct 11 (Sun, outside trip) through Oct 17 (Sat) -->
+    <div class="week-block">
+      <div class="cal-grid">
+        <div style="grid-row:1;grid-column:1;"></div>
+        <div class="day-header outside-trip" style="grid-row:1;grid-column:2;">Oct 11<span class="dow">Sun</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:3;">Oct 12<span class="dow">Mon</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:4;">Oct 13<span class="dow">Tue</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:5;">Oct 14<span class="dow">Wed</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:6;">Oct 15<span class="dow">Thu</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:7;">Oct 16<span class="dow">Fri</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:8;">Oct 17<span class="dow">Sat</span></div>
+
+        <div class="row-label" style="grid-row:2;grid-column:1;">All day</div>
+        <div class="cal-cell outside-trip" style="grid-row:2;grid-column:2;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w1d1" data-col="3" style="grid-row:2;grid-column:3;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w1d2" data-col="4" style="grid-row:2;grid-column:4;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w1d3" data-col="5" style="grid-row:2;grid-column:5;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w1d4" data-col="6" style="grid-row:2;grid-column:6;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w1d5" data-col="7" style="grid-row:2;grid-column:7;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w1d6" data-col="8" style="grid-row:2;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:3;grid-column:1;">Morning</div>
+        <div class="cal-cell outside-trip" style="grid-row:3;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w1d1" data-row="3" data-col="3" style="grid-row:3;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w1d2" data-row="3" data-col="4" style="grid-row:3;grid-column:4;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w1d3" data-row="3" data-col="5" style="grid-row:3;grid-column:5;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w1d4" data-row="3" data-col="6" style="grid-row:3;grid-column:6;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w1d5" data-row="3" data-col="7" style="grid-row:3;grid-column:7;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w1d6" data-row="3" data-col="8" style="grid-row:3;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:4;grid-column:1;">Midday</div>
+        <div class="cal-cell outside-trip" style="grid-row:4;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w1d1" data-row="4" data-col="3" style="grid-row:4;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w1d2" data-row="4" data-col="4" style="grid-row:4;grid-column:4;">
+          <div class="conflict-badge">&#9888; 2 items scheduled here</div>
+          <div class="flight-chip" data-popover-type="flight" data-popover-key="arrival">&#9992; Arrives 12:15pm<span class="auto-tag">AUTO</span></div>
+          <div class="placed-card demo-collision" data-popover-type="activity" data-popover-key="district6">
+            <span class="placed-label">District Six Museum</span>
+          </div>
+        </div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w1d3" data-row="4" data-col="5" style="grid-row:4;grid-column:5;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w1d4" data-row="4" data-col="6" style="grid-row:4;grid-column:6;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w1d5" data-row="4" data-col="7" style="grid-row:4;grid-column:7;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w1d6" data-row="4" data-col="8" style="grid-row:4;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:5;grid-column:1;">Afternoon</div>
+        <div class="cal-cell outside-trip" style="grid-row:5;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w1d1" data-row="5" data-col="3" style="grid-row:5;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w1d2" data-row="5" data-col="4" style="grid-row:5;grid-column:4;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w1d3" data-row="5" data-col="5" style="grid-row:5;grid-column:5;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w1d4" data-row="5" data-col="6" style="grid-row:5;grid-column:6;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w1d5" data-row="5" data-col="7" style="grid-row:5;grid-column:7;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w1d6" data-row="5" data-col="8" style="grid-row:5;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:6;grid-column:1;">Evening</div>
+        <div class="cal-cell outside-trip" style="grid-row:6;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w1d1" data-row="6" data-col="3" style="grid-row:6;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w1d2" data-row="6" data-col="4" style="grid-row:6;grid-column:4;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w1d3" data-row="6" data-col="5" style="grid-row:6;grid-column:5;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w1d4" data-row="6" data-col="6" style="grid-row:6;grid-column:6;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w1d5" data-row="6" data-col="7" style="grid-row:6;grid-column:7;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w1d6" data-row="6" data-col="8" style="grid-row:6;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:7;grid-column:1;">Lodging</div>
+        <div class="cal-cell outside-trip" style="grid-row:7;grid-column:2;"></div>
+        <div class="cal-cell lodging-gap" style="grid-row:7;grid-column:3;">No lodging booked &#9888;</div>
+        <div class="cal-cell lodging-cell" data-popover-type="lodging" data-popover-key="silo" style="grid-row:7;grid-column:4 / span 3;">The Silo Hotel &middot; Cape Town (3 nights)<span class="auto-tag">AUTO</span></div>
+        <div class="cal-cell lodging-gap" style="grid-row:7;grid-column:7;">No lodging booked &#9888;</div>
+        <div class="cal-cell lodging-gap" style="grid-row:7;grid-column:8;">No lodging booked &#9888;</div>
+      </div>
+    </div>
+
+    <!-- Week 2: Oct 18 (Sun) through Oct 24 (Sat, outside trip after Oct 20) -->
+    <div class="week-block">
+      <div class="cal-grid">
+        <div style="grid-row:1;grid-column:1;"></div>
+        <div class="day-header" style="grid-row:1;grid-column:2;">Oct 18<span class="dow">Sun</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:3;">Oct 19<span class="dow">Mon</span></div>
+        <div class="day-header" style="grid-row:1;grid-column:4;">Oct 20<span class="dow">Tue</span></div>
+        <div class="day-header outside-trip" style="grid-row:1;grid-column:5;">Oct 21<span class="dow">Wed</span></div>
+        <div class="day-header outside-trip" style="grid-row:1;grid-column:6;">Oct 22<span class="dow">Thu</span></div>
+        <div class="day-header outside-trip" style="grid-row:1;grid-column:7;">Oct 23<span class="dow">Fri</span></div>
+        <div class="day-header outside-trip" style="grid-row:1;grid-column:8;">Oct 24<span class="dow">Sat</span></div>
+
+        <div class="row-label" style="grid-row:2;grid-column:1;">All day</div>
+        <div class="cal-cell allday-row-cell" data-day="w2d1" data-col="2" style="grid-row:2;grid-column:2;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w2d2" data-col="3" style="grid-row:2;grid-column:3;"></div>
+        <div class="cal-cell allday-row-cell" data-day="w2d3" data-col="4" style="grid-row:2;grid-column:4;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:2;grid-column:5;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:2;grid-column:6;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:2;grid-column:7;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:2;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:3;grid-column:1;">Morning</div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w2d1" data-row="3" data-col="2" style="grid-row:3;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w2d2" data-row="3" data-col="3" style="grid-row:3;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="morning" data-day="w2d3" data-row="3" data-col="4" style="grid-row:3;grid-column:4;"><div class="flight-chip" data-popover-type="flight" data-popover-key="departure">&#9992; Depart 9:10am home<span class="auto-tag">AUTO</span></div></div>
+        <div class="cal-cell outside-trip" style="grid-row:3;grid-column:5;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:3;grid-column:6;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:3;grid-column:7;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:3;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:4;grid-column:1;">Midday</div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w2d1" data-row="4" data-col="2" style="grid-row:4;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w2d2" data-row="4" data-col="3" style="grid-row:4;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="midday" data-day="w2d3" data-row="4" data-col="4" style="grid-row:4;grid-column:4;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:4;grid-column:5;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:4;grid-column:6;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:4;grid-column:7;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:4;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:5;grid-column:1;">Afternoon</div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w2d1" data-row="5" data-col="2" style="grid-row:5;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w2d2" data-row="5" data-col="3" style="grid-row:5;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="afternoon" data-day="w2d3" data-row="5" data-col="4" style="grid-row:5;grid-column:4;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:5;grid-column:5;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:5;grid-column:6;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:5;grid-column:7;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:5;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:6;grid-column:1;">Evening</div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w2d1" data-row="6" data-col="2" style="grid-row:6;grid-column:2;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w2d2" data-row="6" data-col="3" style="grid-row:6;grid-column:3;"></div>
+        <div class="cal-cell slot-cell" data-slot="evening" data-day="w2d3" data-row="6" data-col="4" style="grid-row:6;grid-column:4;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:6;grid-column:5;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:6;grid-column:6;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:6;grid-column:7;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:6;grid-column:8;"></div>
+
+        <div class="row-label" style="grid-row:7;grid-column:1;">Lodging</div>
+        <div class="cal-cell" style="grid-row:7;grid-column:2;background:transparent;padding:0;">
+          <div class="lodging-gap" style="flex:1;">No lodging &#9888;</div>
+          <div class="transport-warn">Transport needed:<br>Cape Town &rarr; Kruger</div>
+        </div>
+        <div class="cal-cell lodging-cell" data-popover-type="lodging" data-popover-key="kruger" style="grid-row:7;grid-column:3 / span 2;">Kruger Safari Lodge (2 nights)<span class="auto-tag">AUTO</span></div>
+        <div class="cal-cell outside-trip" style="grid-row:7;grid-column:5;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:7;grid-column:6;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:7;grid-column:7;"></div>
+        <div class="cal-cell outside-trip" style="grid-row:7;grid-column:8;"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ---- v6: fake data behind the auto-scheduled flights/lodging + the one
+  // hardcoded activity used in the collision demo. In the real app these
+  // would be idea-card fields, not a separate lookup table.
+  const FAKE_DATA = {
+    flight: {
+      arrival: { title: "Flight to Cape Town (NH 106)", from: "JFK", to: "CPT", depDate: "2026-10-12", depTime: "18:40", arrDate: "2026-10-13", arrTime: "12:15", confirmation: "XJ4K7Q", details: "" },
+      departure: { title: "Flight home (NH 105)", from: "CPT", to: "JFK", depDate: "2026-10-19", depTime: "09:10", arrDate: "2026-10-19", arrTime: "19:30", confirmation: "XJ4K7Q", details: "" }
+    },
+    lodging: {
+      silo: { title: "The Silo Hotel", checkin: "2026-10-13", checkout: "2026-10-16", confirmation: "RES-88213", details: "" },
+      kruger: { title: "Kruger Safari Lodge", checkin: "2026-10-19", checkout: "2026-10-21", confirmation: "KRU-4471", details: "" }
+    },
+    activity: {
+      district6: { title: "District Six Museum", details: "" }
+    }
+  };
+  const DYNAMIC_DATA = {};
+  let dynamicIdCounter = 0;
+
+  function esc(s) { return (s || "").replace(/"/g, "&quot;"); }
+
+  function popoverFieldsHtml(type, data) {
+    const closeBtn = `<button type="button" class="popover-close" title="Close">&times;</button>`;
+    if (type === "flight") {
+      return `
+        <div class="popover-head">
+          <span class="auto-tag" style="margin-left:0;">AUTO-SCHEDULED</span>
+          ${closeBtn}
+        </div>
+        <div class="popover-title">&#9992; ${data.title}</div>
+        <p class="popover-hint">Placed automatically because this flight has a confirmed departure time. Changing the date/time here would move it on the calendar - it doesn't need to be dragged.</p>
+        <div class="row"><label>From<input type="text" value="${esc(data.from)}"></label><label>To<input type="text" value="${esc(data.to)}"></label></div>
+        <div class="row"><label>Departure date<input type="date" value="${data.depDate}"></label><label>Departure time<input type="time" value="${data.depTime}"></label></div>
+        <div class="row"><label>Arrival date<input type="date" value="${data.arrDate}"></label><label>Arrival time<input type="time" value="${data.arrTime}"></label></div>
+        <label>Confirmation #<input type="text" value="${esc(data.confirmation)}"></label>
+        <label>Details<textarea>${esc(data.details)}</textarea></label>
+        <button type="button" class="primary">Save</button>
+      `;
+    }
+    if (type === "lodging") {
+      return `
+        <div class="popover-head">
+          <span class="auto-tag" style="margin-left:0;">AUTO-SCHEDULED</span>
+          ${closeBtn}
+        </div>
+        <div class="popover-title">&#127968; ${data.title}</div>
+        <p class="popover-hint">Placed automatically from its check-in/check-out dates.</p>
+        <div class="row"><label>Check-in<input type="date" value="${data.checkin}"></label><label>Check-out<input type="date" value="${data.checkout}"></label></div>
+        <label>Confirmation #<input type="text" value="${esc(data.confirmation)}"></label>
+        <label>Check-in details<textarea>${esc(data.details)}</textarea></label>
+        <button type="button" class="primary">Save</button>
+      `;
+    }
+    return `
+      <div class="popover-head">
+        <span class="popover-title">&#128506; ${data.title}</span>
+        ${closeBtn}
+      </div>
+      <p class="popover-hint">Date &amp; time come from where this is placed on the calendar - drag it to reschedule instead of editing here.</p>
+      <label>Confirmation / details<textarea placeholder="Confirmation #, address, pickup notes...">${esc(data.details)}</textarea></label>
+      <button type="button" class="primary">Save</button>
+    `;
+  }
+
+  function positionPopover(pop, anchor) {
+    // Always start below the anchor, then clamp - never flip to a position
+    // that would push the popover above the top of the page (that's the
+    // "flows off the top" bug: flipping "above" a near-the-top anchor can
+    // land at a negative top).
+    const r = anchor.getBoundingClientRect();
+    let top = window.scrollY + r.bottom + 8;
+    let left = window.scrollX + r.left;
+    pop.style.top = top + "px";
+    pop.style.left = left + "px";
+    requestAnimationFrame(() => {
+      const pr = pop.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 12) {
+        left = window.scrollX + window.innerWidth - pr.width - 12;
+      }
+      if (left < window.scrollX + 12) left = window.scrollX + 12;
+
+      const minTop = window.scrollY + 8;
+      const fitsAbove = (r.top - pr.height - 8) >= 8; // room above, relative to viewport top
+      if (pr.bottom > window.scrollY + window.innerHeight - 12 && fitsAbove) {
+        top = window.scrollY + r.top - pr.height - 8;
+      }
+      if (top < minTop) top = minTop;
+
+      pop.style.top = top + "px";
+      pop.style.left = left + "px";
+    });
+  }
+
+  function closeEditPopover() {
+    if (window._openPopover) { window._openPopover.remove(); window._openPopover = null; }
+  }
+
+  function openEditPopover(anchor, type, data) {
+    closeEditPopover();
+    const pop = document.createElement("div");
+    pop.className = "edit-popover";
+    pop.dataset.type = type;
+    pop.dataset.key = anchor.dataset.popoverKey;
+    pop.innerHTML = popoverFieldsHtml(type, data);
+    document.body.appendChild(pop);
+    pop._anchor = anchor;
+    positionPopover(pop, anchor);
+    window._openPopover = pop;
+  }
+
+  function getPopoverData(trigger) {
+    const type = trigger.dataset.popoverType;
+    const key = trigger.dataset.popoverKey;
+    if (type === "activity" && DYNAMIC_DATA[key]) return DYNAMIC_DATA[key];
+    if (FAKE_DATA[type] && FAKE_DATA[type][key]) return FAKE_DATA[type][key];
+    return { title: trigger.textContent.trim(), details: "" };
+  }
+
+  // Reads whatever is currently typed into an open popover's fields, in the
+  // same field order popoverFieldsHtml() rendered them.
+  function readPopoverValues(pop, type) {
+    const inputs = pop.querySelectorAll("input");
+    const textarea = pop.querySelector("textarea");
+    if (type === "flight") {
+      return {
+        from: inputs[0].value, to: inputs[1].value,
+        depDate: inputs[2].value, depTime: inputs[3].value,
+        arrDate: inputs[4].value, arrTime: inputs[5].value,
+        confirmation: inputs[6].value,
+        details: textarea.value
+      };
+    }
+    if (type === "lodging") {
+      return {
+        checkin: inputs[0].value, checkout: inputs[1].value,
+        confirmation: inputs[2].value,
+        details: textarea.value
+      };
+    }
+    return { details: textarea.value };
+  }
+
+  // Visible proof that Save actually did something, since this mockup has
+  // no real data layer underneath it: a small clip icon appears next to a
+  // plain activity's label once it has saved confirmation/details text.
+  function markSavedIndicator(anchor, details) {
+    const labelEl = anchor.querySelector(".placed-label") || anchor;
+    let icon = anchor.querySelector(".saved-icon");
+    if (details && details.trim()) {
+      if (!icon) {
+        icon = document.createElement("span");
+        icon.className = "saved-icon";
+        icon.title = "Confirmation/details saved";
+        icon.textContent = " \u{1F4CB}";
+        labelEl.appendChild(icon);
+      }
+    } else if (icon) {
+      icon.remove();
+    }
+  }
+
+  // Single delegated click handler covers static AND dynamically-created
+  // (dragged-from-sidebar) placed items alike, plus Save/Close inside
+  // whichever popover is currently open.
+  document.addEventListener("click", (e) => {
+    const closeBtn = e.target.closest(".popover-close");
+    if (closeBtn) { closeEditPopover(); return; }
+
+    const saveBtn = e.target.closest(".edit-popover button.primary");
+    if (saveBtn) {
+      const pop = saveBtn.closest(".edit-popover");
+      const type = pop.dataset.type;
+      const key = pop.dataset.key;
+      const values = readPopoverValues(pop, type);
+      if (type === "activity") {
+        DYNAMIC_DATA[key] = Object.assign(DYNAMIC_DATA[key] || {}, values);
+        if (pop._anchor) markSavedIndicator(pop._anchor, values.details);
+      } else if (FAKE_DATA[type] && FAKE_DATA[type][key]) {
+        Object.assign(FAKE_DATA[type][key], values);
+      }
+      closeEditPopover();
+      return;
+    }
+
+    const trigger = e.target.closest("[data-popover-type]");
+    if (trigger) { openEditPopover(trigger, trigger.dataset.popoverType, getPopoverData(trigger)); return; }
+    if (!e.target.closest(".edit-popover")) { closeEditPopover(); }
+  });
+
+  // dragPayload describes whatever is currently being dragged:
+  //   kind "idea"      - a fresh card from the Itinerary Building Blocks sidebar
+  //   kind "placed"    - an already-scheduled single-slot card being moved
+  //   kind "alldaybar" - an already-scheduled all-day (possibly multi-day, possibly
+  //                      cross-week) block being moved; carries a reference to its
+  //                      controller state object rather than a single DOM element,
+  //                      since a cross-week bar is rendered as multiple segments.
+  let dragPayload = null;
+  const MAX_SLOT_ROW = 6; // Evening is the last slot row before Lodging
+
+  function attachIdeaDragHandlers(card) {
+    card.addEventListener("dragstart", (e) => {
+      const pillEl = card.querySelector(".pill");
+      dragPayload = {
+        kind: "idea",
+        sourceEl: card,
+        label: card.querySelector("div:nth-child(2)").textContent,
+        pillHtml: pillEl ? pillEl.outerHTML : ""
+      };
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+  }
+  document.querySelectorAll(".idea-card").forEach(attachIdeaDragHandlers);
+
+  function restoreIdeaCard(pillHtml, label) {
+    const card = document.createElement("div");
+    card.className = "idea-card";
+    card.draggable = true;
+    card.innerHTML = `${pillHtml}<div>${label}</div>`;
+    document.getElementById("sidebar").appendChild(card);
+    attachIdeaDragHandlers(card);
+  }
+
+  function hideDaySlots(dayKey) {
+    document.querySelectorAll(`.slot-cell[data-day="${dayKey}"]`).forEach(c => { c.style.display = "none"; });
+  }
+  function showDaySlots(dayKey) {
+    document.querySelectorAll(`.slot-cell[data-day="${dayKey}"]`).forEach(c => { c.style.display = ""; });
+  }
+
+  // Full trip-wide day order (both weeks, in calendar order) - used so an
+  // all-day item can extend/shrink/move across the week-1 -> week-2 boundary.
+  function getAllDaysInOrder() {
+    let days = [];
+    document.querySelectorAll(".week-block").forEach(wb => {
+      const grid = wb.querySelector(".cal-grid");
+      const cells = Array.from(grid.querySelectorAll(".allday-row-cell"))
+        .sort((a, b) => parseInt(a.dataset.col, 10) - parseInt(b.dataset.col, 10));
+      days = days.concat(cells.map(c => c.dataset.day));
+    });
+    return days;
+  }
+
+  function dayWeekGrid(dayKey) {
+    const cell = document.querySelector(`.allday-row-cell[data-day="${dayKey}"]`);
+    return cell ? cell.closest(".cal-grid") : null;
+  }
+
+  // Groups a (contiguous, in-order) list of day keys into runs that share the
+  // same week-grid, so a bar spanning a week boundary can be drawn as one
+  // segment per week - same idea as how a real month-view calendar splits a
+  // multi-day event across row boundaries.
+  function groupRunsByWeek(days) {
+    const runs = [];
+    let current = null;
+    days.forEach(d => {
+      const wg = dayWeekGrid(d);
+      if (!current || current.weekGrid !== wg) {
+        current = { weekGrid: wg, days: [] };
+        runs.push(current);
+      }
+      current.days.push(d);
+    });
+    return runs;
+  }
+
+  function createAlldayBarController(initialDayKey, label, pillHtml) {
+    const state = {
+      days: [initialDayKey],
+      label,
+      pillHtml,
+      segments: [],
+      _hiddenDays: []
+    };
+
+    function attachDrag(el) {
+      el.draggable = true;
+      el.addEventListener("dragstart", (ev) => {
+        dragPayload = { kind: "alldaybar", barState: state };
+        el.classList.add("dragging");
+        ev.dataTransfer.effectAllowed = "move";
+      });
+      el.addEventListener("dragend", () => el.classList.remove("dragging"));
+    }
+
+    function render() {
+      // un-hide any day that was covered before this render but isn't anymore
+      state._hiddenDays.forEach(d => {
+        if (!state.days.includes(d)) {
+          showDaySlots(d);
+          const cell = document.querySelector(`.allday-row-cell[data-day="${d}"]`);
+          if (cell) cell.style.display = "";
+        }
+      });
+      state.segments.forEach(s => s.el.remove());
+      state.segments = [];
+
+      const runs = groupRunsByWeek(state.days);
+      runs.forEach((run, i) => {
+        const isLast = i === runs.length - 1;
+        const startCell = document.querySelector(`.allday-row-cell[data-day="${run.days[0]}"]`);
+        const startCol = parseInt(startCell.dataset.col, 10);
+
+        const el = document.createElement("div");
+        el.className = "allday-bar";
+        el.style.gridRow = 2;
+        el.style.gridColumn = `${startCol} / span ${run.days.length}`;
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "allday-bar-label";
+        labelEl.innerHTML = isLast ? `&#128506; ${state.label}` : `&#128506; ${state.label} &rarr;`;
+        el.appendChild(labelEl);
+
+        if (isLast) {
+          const controls = document.createElement("div");
+          controls.className = "placed-controls";
+
+          const shrinkBtn = document.createElement("button");
+          shrinkBtn.className = "shrink-btn";
+          shrinkBtn.textContent = "−";
+          shrinkBtn.title = "Shrink by one day";
+          shrinkBtn.draggable = false;
+          shrinkBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (state.days.length <= 1) return;
+            state.days.pop();
+            render();
+          });
+
+          const extendBtn = document.createElement("button");
+          extendBtn.className = "extend-btn";
+          extendBtn.textContent = "+";
+          extendBtn.title = "Extend into the next day";
+          extendBtn.draggable = false;
+          extendBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const order = getAllDaysInOrder();
+            const lastIdx = order.indexOf(state.days[state.days.length - 1]);
+            if (lastIdx === -1 || lastIdx === order.length - 1) return;
+            state.days.push(order[lastIdx + 1]);
+            render();
+          });
+
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "remove-btn";
+          removeBtn.textContent = "×";
+          removeBtn.title = "Remove from calendar";
+          removeBtn.draggable = false;
+          removeBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            state.days = [];
+            render();
+            restoreIdeaCard(state.pillHtml, state.label);
+          });
+
+          controls.appendChild(shrinkBtn);
+          controls.appendChild(extendBtn);
+          controls.appendChild(removeBtn);
+          el.appendChild(controls);
+
+          const order = getAllDaysInOrder();
+          const lastIdx = order.indexOf(state.days[state.days.length - 1]);
+          extendBtn.disabled = (lastIdx === -1 || lastIdx === order.length - 1);
+          shrinkBtn.disabled = state.days.length <= 1;
+        }
+
+        attachDrag(el);
+        run.weekGrid.appendChild(el);
+        state.segments.push({ el, weekGrid: run.weekGrid });
+      });
+
+      state.days.forEach(d => {
+        hideDaySlots(d);
+        const cell = document.querySelector(`.allday-row-cell[data-day="${d}"]`);
+        if (cell) cell.style.display = "none";
+      });
+      state._hiddenDays = state.days.slice();
+    }
+
+    state.render = render;
+    render();
+    return state;
+  }
+
+  function moveAlldayBar(barState, targetDayKey) {
+    const order = getAllDaysInOrder();
+    const startIdx = order.indexOf(targetDayKey);
+    if (startIdx === -1) return;
+    const span = barState.days.length;
+    const newDays = order.slice(startIdx, startIdx + span);
+    if (newDays.length < span) return; // not enough days left in the trip from this point - ignore
+    barState.days = newDays;
+    barState.render();
+  }
+
+  function createPlacedCard(label, pillHtml, dayKey, row, col, weekGrid) {
+    const el = document.createElement("div");
+    el.className = "placed-card";
+    el.draggable = true;
+    el.dataset.day = dayKey;
+    el.dataset.startRow = row;
+    el.dataset.span = 1;
+    el.style.gridColumn = col;
+    el.style.gridRow = `${row} / span 1`;
+
+    // v6: every placed activity is click-to-edit too. Give it a stable key
+    // and register its (fake) data so the shared popover code can find it.
+    const key = "dyn" + (++dynamicIdCounter);
+    DYNAMIC_DATA[key] = { title: label, details: "" };
+    el.dataset.popoverType = "activity";
+    el.dataset.popoverKey = key;
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "placed-label";
+    labelEl.textContent = label;
+
+    const controls = document.createElement("div");
+    controls.className = "placed-controls";
+
+    const shrinkBtn = document.createElement("button");
+    shrinkBtn.className = "shrink-btn";
+    shrinkBtn.textContent = "−";
+    shrinkBtn.title = "Shrink by one slot";
+    shrinkBtn.draggable = false;
+
+    const extendBtn = document.createElement("button");
+    extendBtn.className = "extend-btn";
+    extendBtn.textContent = "+";
+    extendBtn.title = "Extend into next slot";
+    extendBtn.draggable = false;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "×";
+    removeBtn.title = "Remove from calendar";
+    removeBtn.draggable = false;
+
+    controls.appendChild(shrinkBtn);
+    controls.appendChild(extendBtn);
+    controls.appendChild(removeBtn);
+    el.appendChild(labelEl);
+    el.appendChild(controls);
+    weekGrid.appendChild(el);
+
+    function refreshButtons() {
+      const curRow = parseInt(el.dataset.startRow, 10);
+      const curSpan = parseInt(el.dataset.span, 10);
+      extendBtn.disabled = (curRow + curSpan) > MAX_SLOT_ROW;
+      shrinkBtn.disabled = curSpan <= 1;
+    }
+    refreshButtons();
+
+    extendBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const curRow = parseInt(el.dataset.startRow, 10);
+      const curSpan = parseInt(el.dataset.span, 10);
+      if ((curRow + curSpan) > MAX_SLOT_ROW) return;
+      el.dataset.span = curSpan + 1;
+      el.style.gridRow = `${curRow} / span ${curSpan + 1}`;
+      refreshButtons();
+    });
+
+    shrinkBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const curRow = parseInt(el.dataset.startRow, 10);
+      const curSpan = parseInt(el.dataset.span, 10);
+      if (curSpan <= 1) return;
+      el.dataset.span = curSpan - 1;
+      el.style.gridRow = `${curRow} / span ${curSpan - 1}`;
+      refreshButtons();
+    });
+
+    removeBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      restoreIdeaCard(pillHtml, label);
+      el.remove();
+    });
+
+    el.addEventListener("dragstart", (ev) => {
+      dragPayload = { kind: "placed", el, label, pillHtml, dayKey };
+      el.classList.add("dragging");
+      ev.dataTransfer.effectAllowed = "move";
+    });
+    el.addEventListener("dragend", () => el.classList.remove("dragging"));
+
+    return el;
+  }
+
+  function movePlacedCard(payload, targetCell) {
+    const el = payload.el;
+    const row = parseInt(targetCell.dataset.row, 10);
+    const col = parseInt(targetCell.dataset.col, 10);
+    el.dataset.day = targetCell.dataset.day;
+    el.dataset.startRow = row;
+    el.dataset.span = 1; // moving to a new slot resets the span - re-extend if needed
+    el.style.gridColumn = col;
+    el.style.gridRow = `${row} / span 1`;
+    const extendBtn = el.querySelector(".extend-btn");
+    const shrinkBtn = el.querySelector(".shrink-btn");
+    if (extendBtn) extendBtn.disabled = row >= MAX_SLOT_ROW;
+    if (shrinkBtn) shrinkBtn.disabled = true;
+  }
+
+  document.querySelectorAll(".slot-cell").forEach(cell => {
+    cell.addEventListener("dragover", (e) => { e.preventDefault(); cell.classList.add("drag-over"); });
+    cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
+    cell.addEventListener("drop", (e) => {
+      e.preventDefault();
+      cell.classList.remove("drag-over");
+      if (!dragPayload) return;
+      const dayKey = cell.dataset.day;
+
+      if (dragPayload.kind === "idea") {
+        const row = parseInt(cell.dataset.row, 10);
+        const col = parseInt(cell.dataset.col, 10);
+        const weekGrid = cell.closest(".cal-grid");
+        createPlacedCard(dragPayload.label, dragPayload.pillHtml, dayKey, row, col, weekGrid);
+        dragPayload.sourceEl.remove();
+      } else if (dragPayload.kind === "placed") {
+        movePlacedCard(dragPayload, cell);
+      }
+      // dropping an "alldaybar" onto a single slot cell doesn't make sense - ignore it
+      dragPayload = null;
+    });
+  });
+
+  document.querySelectorAll(".allday-row-cell").forEach(cell => {
+    cell.addEventListener("dragover", (e) => { e.preventDefault(); cell.classList.add("drag-over"); });
+    cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
+    cell.addEventListener("drop", (e) => {
+      e.preventDefault();
+      cell.classList.remove("drag-over");
+      if (!dragPayload) return;
+      const dayKey = cell.dataset.day;
+
+      if (dragPayload.kind === "idea") {
+        createAlldayBarController(dayKey, dragPayload.label, dragPayload.pillHtml);
+        dragPayload.sourceEl.remove();
+      } else if (dragPayload.kind === "placed") {
+        createAlldayBarController(dayKey, dragPayload.label, dragPayload.pillHtml);
+        dragPayload.el.remove();
+      } else if (dragPayload.kind === "alldaybar") {
+        moveAlldayBar(dragPayload.barState, dayKey);
+      }
+      dragPayload = null;
+    });
+  });
+
+  // Drag a placed item back onto the sidebar to unschedule it.
+  const sidebarEl = document.getElementById("sidebar");
+  sidebarEl.addEventListener("dragover", (e) => {
+    if (dragPayload && (dragPayload.kind === "placed" || dragPayload.kind === "alldaybar")) {
+      e.preventDefault();
+      sidebarEl.classList.add("drag-over");
+    }
+  });
+  sidebarEl.addEventListener("dragleave", () => sidebarEl.classList.remove("drag-over"));
+  sidebarEl.addEventListener("drop", (e) => {
+    sidebarEl.classList.remove("drag-over");
+    if (!dragPayload) return;
+    if (dragPayload.kind === "placed") {
+      e.preventDefault();
+      restoreIdeaCard(dragPayload.pillHtml, dragPayload.label);
+      dragPayload.el.remove();
+    } else if (dragPayload.kind === "alldaybar") {
+      e.preventDefault();
+      const label = dragPayload.barState.label;
+      const pillHtml = dragPayload.barState.pillHtml;
+      dragPayload.barState.days = [];
+      dragPayload.barState.render();
+      restoreIdeaCard(pillHtml, label);
+    }
+    dragPayload = null;
+  });
+</script>
+
+</body>
+</html>

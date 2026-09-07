@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Groundwork - Itinerary type-specific fields mockup</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #273449;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-2: #fbbf24;
+    --danger: #f87171;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .mockup-banner {
+    background: var(--accent-2);
+    color: #1a1400;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 8px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  h3 { font-size: 0.85rem; margin: 24px 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.85rem; }
+
+  .type-switcher {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .type-switcher button {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--surface-2);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .type-switcher button.active {
+    background: var(--accent);
+    color: #04121f;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  input, select, textarea {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--surface-2);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  .row { display: flex; gap: 10px; }
+  .row > label { flex: 1; }
+  button.primary {
+    width: 100%;
+    background: var(--accent);
+    color: #04121f;
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button.secondary {
+    width: 100%;
+    background: none;
+    border: 1px dashed var(--muted);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .type-fields { display: none; }
+  .type-fields.active { display: block; }
+  .field-note {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: -8px;
+    margin-bottom: 12px;
+  }
+
+  /* ---- saved itinerary item cards ---- */
+  .list-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .row-title { font-weight: 600; font-size: 1rem; margin-bottom: 2px; }
+  .item-meta { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+  .item-route {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 1.02rem;
+    margin: 4px 0;
+  }
+  .item-route .arrow { color: var(--muted); font-weight: 400; }
+  .confirmation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    margin-top: 8px;
+    color: var(--accent);
+  }
+  .icon-btn {
+    background: none; border: none; color: var(--text);
+    padding: 4px; cursor: pointer; font-size: 1.1rem;
+  }
+  .icon-btn.danger { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP - review only, nothing here is wired up yet</div>
+
+<div class="wrap">
+
+  <h3>Part 1 - the "Add to itinerary" form, per type</h3>
+  <p class="muted small">Pick a type below to see how the form itself changes shape - the Type dropdown is the same as today, only what appears below it changes.</p>
+
+  <div class="type-switcher" id="switcher">
+    <button data-type="flight" class="active">Flight</button>
+    <button data-type="transport">Transport</button>
+    <button data-type="lodging">Lodging</button>
+    <button data-type="activity">Activity / Other</button>
+  </div>
+
+  <form class="card">
+    <h2>Add to itinerary</h2>
+    <label>Type
+      <select id="typeSelect">
+        <option value="flight">Flight</option>
+        <option value="transport">Transport</option>
+        <option value="lodging">Lodging</option>
+        <option value="activity">Activity</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+
+    <!-- FLIGHT / TRANSPORT fields -->
+    <div class="type-fields active" data-fields="flight-transport">
+      <label>Title
+        <input type="text" placeholder="e.g. Flight to Cape Town (NH 106)" />
+      </label>
+      <div class="row">
+        <label>From
+          <input type="text" placeholder="e.g. JFK" />
+        </label>
+        <label>To
+          <input type="text" placeholder="e.g. CPT" />
+        </label>
+      </div>
+      <div class="row">
+        <label>Departure date
+          <input type="date" />
+        </label>
+        <label>Departure time <span class="muted">(optional)</span>
+          <input type="time" />
+        </label>
+      </div>
+      <div class="row">
+        <label>Arrival date
+          <input type="date" />
+        </label>
+        <label>Arrival time <span class="muted">(optional)</span>
+          <input type="time" />
+        </label>
+      </div>
+      <label>Confirmation #
+        <input type="text" placeholder="e.g. XJ4K7Q" />
+      </label>
+      <label>Details <span class="muted">(optional)</span>
+        <textarea placeholder="Seat, terminal, notes..."></textarea>
+      </label>
+      <button class="secondary" type="button">+ Add return leg (swaps From/To)</button>
+    </div>
+
+    <!-- LODGING fields -->
+    <div class="type-fields" data-fields="lodging">
+      <label>Place name
+        <input type="text" placeholder="e.g. The Silo Hotel" />
+      </label>
+      <div class="row">
+        <label>Check-in date
+          <input type="date" />
+        </label>
+        <label>Check-out date
+          <input type="date" />
+        </label>
+      </div>
+      <label>Confirmation #
+        <input type="text" placeholder="e.g. RES-88213" />
+      </label>
+      <label>Check-in details
+        <textarea placeholder="Address, host contact, check-in time/instructions..."></textarea>
+      </label>
+    </div>
+
+    <!-- ACTIVITY / OTHER fields (unchanged) -->
+    <div class="type-fields" data-fields="activity">
+      <label>Title
+        <input type="text" placeholder="e.g. Table Mountain cable car" />
+      </label>
+      <div class="row">
+        <label>Date
+          <input type="date" />
+        </label>
+        <label>Time <span class="muted">(optional)</span>
+          <input type="time" />
+        </label>
+      </div>
+      <label>Details
+        <textarea placeholder="Confirmation #, address, notes..."></textarea>
+      </label>
+    </div>
+
+    <button class="primary" type="button">Add item</button>
+  </form>
+
+  <h3>Part 2 - how saved items look in the list</h3>
+  <p class="muted small">Same three shapes, as they'd appear once saved (fake example data below).</p>
+
+  <div class="card list-row">
+    <div style="flex:1">
+      <div class="row-title">&#9992; Flight to Cape Town (NH 106)</div>
+      <div class="item-route">JFK <span class="arrow">&rarr;</span> CPT</div>
+      <div class="item-meta">Depart Oct 12, 6:40 PM &middot; Arrive Oct 13, 5:15 PM (+1 day)</div>
+      <div class="confirmation-chip">&#128203; Confirmation: XJ4K7Q</div>
+    </div>
+    <button class="icon-btn danger">&times;</button>
+  </div>
+
+  <div class="card list-row">
+    <div style="flex:1">
+      <div class="row-title">&#127968; The Silo Hotel</div>
+      <div class="item-meta">Oct 13 &ndash; Oct 16 (3 nights)</div>
+      <div class="confirmation-chip">&#128203; Confirmation: RES-88213</div>
+    </div>
+    <button class="icon-btn danger">&times;</button>
+  </div>
+
+  <div class="card list-row">
+    <div style="flex:1">
+      <div class="row-title">&#128506; Table Mountain cable car</div>
+      <div class="item-meta">Oct 14 &middot; 9:00 AM</div>
+    </div>
+    <button class="icon-btn danger">&times;</button>
+  </div>
+
+</div>
+
+<script>
+  const fieldsByType = {
+    flight: "flight-transport",
+    transport: "flight-transport",
+    lodging: "lodging",
+    activity: "activity",
+    other: "activity"
+  };
+  function setType(type) {
+    document.querySelectorAll(".type-fields").forEach(el => el.classList.remove("active"));
+    const key = fieldsByType[type];
+    document.querySelector(`.type-fields[data-fields="${key}"]`).classList.add("active");
+    document.getElementById("typeSelect").value = type;
+    document.querySelectorAll(".type-switcher button").forEach(b => {
+      b.classList.toggle("active", b.dataset.type === type);
+    });
+  }
+  document.getElementById("switcher").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    setType(btn.dataset.type);
+  });
+  document.getElementById("typeSelect").addEventListener("change", (e) => setType(e.target.value));
+</script>
+
+</body>
+</html>
