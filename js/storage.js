@@ -25,7 +25,6 @@ function emptyState() {
   return {
     trips: [],          // [{ id, name, destination, startDate, endDate }]
     activeTripId: null,  // which trip is currently selected in the UI
-    itinerary: {},       // { [tripId]: [ {id, date, time, type, title, details} ] }
     packing: {},          // { [tripId]: [ {id, text, checked, category} ] }
     budget: {},            // { [tripId]: [ {id, description, amount, currency, category, date} ] }
     notes: {},               // { [tripId]: [ {id, title, body} ] }  <- confirmations, doc numbers, etc.
@@ -87,7 +86,6 @@ function createTrip({ name, destination, startDate, endDate }) {
   state.trips.push(trip);
   state.activeTripId = trip.id;
   // Set up empty lists for this trip in every category.
-  state.itinerary[trip.id] = [];
   state.packing[trip.id] = [];
   state.budget[trip.id] = [];
   state.notes[trip.id] = [];
@@ -99,7 +97,6 @@ function createTrip({ name, destination, startDate, endDate }) {
 function deleteTrip(tripId) {
   const state = loadState();
   state.trips = state.trips.filter((t) => t.id !== tripId);
-  delete state.itinerary[tripId];
   delete state.packing[tripId];
   delete state.budget[tripId];
   delete state.notes[tripId];
@@ -107,35 +104,6 @@ function deleteTrip(tripId) {
   if (state.activeTripId === tripId) {
     state.activeTripId = state.trips.length ? state.trips[0].id : null;
   }
-  saveState(state);
-}
-
-/* -------------------------- Itinerary --------------------------- */
-
-function getItinerary(tripId) {
-  const state = loadState();
-  const items = state.itinerary[tripId] || [];
-  // Keep the list sorted by date then time so the itinerary always reads
-  // top-to-bottom in chronological order, no matter the entry order.
-  return [...items].sort((a, b) => {
-    const aKey = `${a.date || ""} ${a.time || ""}`;
-    const bKey = `${b.date || ""} ${b.time || ""}`;
-    return aKey.localeCompare(bKey);
-  });
-}
-
-function addItineraryItem(tripId, item) {
-  const state = loadState();
-  if (!state.itinerary[tripId]) state.itinerary[tripId] = [];
-  state.itinerary[tripId].push({ id: makeId(), ...item });
-  saveState(state);
-}
-
-function deleteItineraryItem(tripId, itemId) {
-  const state = loadState();
-  state.itinerary[tripId] = (state.itinerary[tripId] || []).filter(
-    (i) => i.id !== itemId
-  );
   saveState(state);
 }
 

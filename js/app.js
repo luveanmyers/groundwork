@@ -1387,75 +1387,14 @@ function mapUnplottedHtml(unplotted) {
 }
 
 /* ---------------------------- Itinerary tab ---------------------------- */
+// The old generic type/title/date/time itinerary list + form lived here.
+// Removed 2026-09-09 (Phase 3, Step 1 of the calendar port) - Flight/Lodging/
+// Transport now flow through idea cards (see the kanban/ideas system), and
+// this tab is being rebuilt as the real Building-view month calendar
+// (LUV-6). This stub is a placeholder until that grid lands.
 
 function itineraryTabHtml(trip) {
-  const items = getItinerary(trip.id);
-  const rows = items
-    .map(
-      (i) => `
-      <div class="card list-row">
-        <div>
-          <div class="row-title">${itineraryIcon(i.type)} ${escapeHtml(i.title)}</div>
-          <div class="muted small">${formatDate(i.date)}${i.time ? " &middot; " + escapeHtml(i.time) : ""}</div>
-          ${i.details ? `<div class="small">${escapeHtml(i.details)}</div>` : ""}
-        </div>
-        <button class="icon-btn danger" onclick="handleDeleteItinerary('${trip.id}', '${i.id}')" aria-label="Delete">&times;</button>
-      </div>`
-    )
-    .join("");
-
-  return `
-    ${items.length ? rows : emptyStateHtml("No itinerary items yet. Add flights, lodging, or activities below.")}
-    <form class="card form" onsubmit="handleAddItinerary(event, '${trip.id}')">
-      <h2>Add to itinerary</h2>
-      <label>Type
-        <select name="type">
-          <option value="flight">Flight</option>
-          <option value="lodging">Lodging</option>
-          <option value="activity">Activity</option>
-          <option value="transport">Transport</option>
-          <option value="other">Other</option>
-        </select>
-      </label>
-      <label>Title
-        <input name="title" type="text" placeholder="e.g. Flight to Tokyo (NH 106)" required />
-      </label>
-      <div class="row">
-        <label>Date
-          <input name="date" type="date" />
-        </label>
-        <label>Time
-          <input name="time" type="time" />
-        </label>
-      </div>
-      <label>Details
-        <textarea name="details" placeholder="Confirmation #, address, notes..."></textarea>
-      </label>
-      <button class="primary" type="submit">Add item</button>
-    </form>
-  `;
-}
-
-function itineraryIcon(type) {
-  return { flight: "&#9992;", lodging: "&#127968;", activity: "&#128506;", transport: "&#128652;" }[type] || "&#128204;";
-}
-
-function handleAddItinerary(event, tripId) {
-  event.preventDefault();
-  const form = event.target;
-  addItineraryItem(tripId, {
-    type: form.type.value,
-    title: form.title.value.trim(),
-    date: form.date.value,
-    time: form.time.value,
-    details: form.details.value.trim()
-  });
-  renderTabContent(getActiveTrip());
-}
-
-function handleDeleteItinerary(tripId, itemId) {
-  deleteItineraryItem(tripId, itemId);
-  renderTabContent(getActiveTrip());
+  return emptyStateHtml("The Building-view calendar is under construction - check back soon.");
 }
 
 /* ----------------------------- Packing tab ----------------------------- */
