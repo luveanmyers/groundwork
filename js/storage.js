@@ -277,9 +277,22 @@ function addIdea(tripId, input) {
     departureTime: input.departureTime || "",
     arrivalDate: input.arrivalDate || "",
     arrivalTime: input.arrivalTime || "",
-    // Lodging uses a date range instead of a single date/time.
+    // Lodging uses a date range instead of a single date/time. checkInTime/
+    // checkOutTime are separate, optional time-of-day fields (added Phase 3
+    // close-out, 2026-09-11) - a placed lodging bar shows checkInTime on the
+    // day it starts and checkOutTime on the day it ends. See
+    // product-decisions.md "Placed-card tag display + time label".
     checkInDate: input.checkInDate || "",
     checkOutDate: input.checkOutDate || "",
+    checkInTime: input.checkInTime || "",
+    checkOutTime: input.checkOutTime || "",
+    // Optional time for a reservation-needed item of ANY activityType (a
+    // dinner reservation, a timed museum-tour slot, etc.) - independent of
+    // the flight/transport/lodging logistics fields above. Deliberately
+    // always optional, even when reservationNeeded is true: a reservation
+    // can exist without a specific time attached (e.g. a same-day-any-time
+    // booking). Added Phase 3 close-out, 2026-09-11.
+    reservationTime: input.reservationTime || "",
     // Where this card sits on the Building-mode calendar, once it has a
     // spot there - either because it auto-placed itself (a confirmed
     // departure or check-in date) or because it was manually dragged into
@@ -437,6 +450,21 @@ function migrateIdeasInState(state) {
         migrated = {
           ...migrated,
           scheduled: { ...migrated.scheduled, span: 1 }
+        };
+      }
+
+      // Migration 4: cards created before checkInTime/checkOutTime/
+      // reservationTime existed (Phase 3 close-out, 2026-09-11) don't have
+      // them. Backfill as empty strings, same pattern as Migration 2, so
+      // older trips don't break once the placed-card time chip starts
+      // reading these fields.
+      if (migrated.reservationTime === undefined) {
+        changed = true;
+        migrated = {
+          ...migrated,
+          checkInTime: migrated.checkInTime || "",
+          checkOutTime: migrated.checkOutTime || "",
+          reservationTime: migrated.reservationTime || ""
         };
       }
 

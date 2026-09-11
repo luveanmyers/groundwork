@@ -1475,12 +1475,17 @@ button.primary:active {
   padding: 4px 6px;
   font-size: 0.78rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  min-height: 40px; /* room for icon+title row plus a time row without
+                        relying on nested flex/grid auto-sizing to work
+                        it out - confirmed 2026-09-11 after that math
+                        proved unreliable in testing, see
+                        product-decisions.md */
+  gap: 2px;
   flex: 1;
   min-width: 0;
-  min-height: 0;
   cursor: grab;
 }
 .cal-placed-card[draggable="true"]:active {
@@ -1489,18 +1494,39 @@ button.primary:active {
 .cal-placed-card.dragging {
   opacity: 0.35;
 }
+.cal-placed-card .placed-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
 .cal-placed-card .placed-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 .cal-placed-card .placed-label svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+.cal-placed-card .placed-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.cal-placed-card .placed-time-row {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  padding-left: 18px; /* lines up under the title text, after the icon */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 .cal-placed-card.allday-bar {
   background: var(--tint);

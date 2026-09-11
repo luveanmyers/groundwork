@@ -539,7 +539,7 @@ function ideaFormHtml(trip) {
     <form class="card form" onsubmit="handleAddIdea(event, '${trip.id}')">
       <h2>Add an idea</h2>
       <label>Title
-        <input name="title" type="text" placeholder="e.g. Table Mountain cable car" required />
+        <input name="title" type="text" maxlength="25" placeholder="e.g. Table Mountain cable car" required />
       </label>
       <label>Description
         <textarea name="description" placeholder="Why it's interesting, where you saw it..."></textarea>
@@ -596,6 +596,14 @@ function ideaFormHtml(trip) {
           <input name="checkOutDate" type="date" />
         </label>
       </div>
+      <div class="row" data-activity-fields="lodging" style="display:none">
+        <label>Check-in time <span class="muted small">(optional)</span>
+          <input name="checkInTime" type="time" />
+        </label>
+        <label>Check-out time <span class="muted small">(optional)</span>
+          <input name="checkOutTime" type="time" />
+        </label>
+      </div>
       <label class="form-checkbox-row">
         <input type="checkbox" name="reservationNeeded" onchange="handleAddFormReservationToggle(this)" />
         <span>Reservation needed</span>
@@ -613,6 +621,9 @@ function ideaFormHtml(trip) {
       </label>
       <label>Confirmation details
         <textarea name="confirmationInfo" placeholder="Confirmation #, phone number, pickup instructions..." disabled></textarea>
+      </label>
+      <label>Reservation time <span class="muted small">(optional - not every reservation has a fixed time)</span>
+        <input name="reservationTime" type="time" disabled />
       </label>
       <button class="primary" type="submit">Add idea</button>
     </form>
@@ -632,7 +643,7 @@ function handleAddFormReservationToggle(checkbox) {
     el.disabled = !enabled;
     if (!enabled) el.checked = false;
   });
-  [form.urgencyNotes, form.confirmationInfo].forEach((el) => {
+  [form.urgencyNotes, form.confirmationInfo, form.reservationTime].forEach((el) => {
     el.disabled = !enabled;
     if (!enabled) el.value = "";
   });
@@ -828,6 +839,16 @@ function logisticsFieldsHtml(trip, idea) {
           <input type="date" value="${escapeHtml(idea.checkOutDate)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'checkOutDate', this.value)" />
         </label>
       </div>
+      <div class="idea-edit-row">
+        <label class="idea-edit-field">
+          <span>Check-in time <span class="muted small">(optional)</span></span>
+          <input type="time" value="${escapeHtml(idea.checkInTime)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'checkInTime', this.value)" />
+        </label>
+        <label class="idea-edit-field">
+          <span>Check-out time <span class="muted small">(optional)</span></span>
+          <input type="time" value="${escapeHtml(idea.checkOutTime)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'checkOutTime', this.value)" />
+        </label>
+      </div>
     `;
   }
   return "";
@@ -947,6 +968,10 @@ function kanbanCardHtml(trip, idea, columnKey) {
           <label class="confirmation-info-field">
             <span>Confirmation details</span>
             <textarea placeholder="Confirmation #, phone number, pickup instructions..." onchange="handleUpdateConfirmationInfo('${trip.id}', '${idea.id}', this.value)">${escapeHtml(idea.confirmationInfo)}</textarea>
+          </label>
+          <label class="idea-edit-field">
+            <span>Reservation time <span class="muted small">(optional - not every reservation has a fixed time)</span></span>
+            <input type="time" value="${escapeHtml(idea.reservationTime)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'reservationTime', this.value)" />
           </label>
           ${idea.reserved && !idea.confirmationInfo ? `<div class="confirmation-nudge">Add confirmation details so it's easy to find while you're traveling.</div>` : ""}
         ` : ""}
@@ -1093,7 +1118,10 @@ function handleAddIdea(event, tripId) {
     arrivalDate: form.arrivalDate.value,
     arrivalTime: form.arrivalTime.value,
     checkInDate: form.checkInDate.value,
-    checkOutDate: form.checkOutDate.value
+    checkOutDate: form.checkOutDate.value,
+    checkInTime: form.checkInTime.value,
+    checkOutTime: form.checkOutTime.value,
+    reservationTime: form.reservationTime.value
   });
   isAddIdeaFormOpen = false;
   renderTabContent(getActiveTrip());
@@ -1646,6 +1674,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip) {
       const segmentDays = fullRange.filter((d) => weekDayKeys.includes(d));
       if (!segmentDays.length) return;
       const col = 2 + weekDayKeys.indexOf(segmentDays[0]);
+      const isFirstSegment = fullRange[0] === segmentDays[0];
       const isLastSegment = fullRange[fullRange.length - 1] === segmentDays[segmentDays.length - 1];
       // Same reasoning as the regular-slot groups above - a drop
       // anywhere on this bar targets the first day of THIS segment,
@@ -1656,7 +1685,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip) {
              ondragover="handleCalendarDragOver(event)"
              ondragleave="handleCalendarDragLeave(event)"
              ondrop="handleCalendarDrop(event, '${trip.id}', '${segmentDays[0]}', 'allday')">
-          ${calendarPlacedCardHtml(idea, trip, span, isLastSegment)}
+          ${calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment)}
         </div>
       `);
     });
@@ -1669,9 +1698,12 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip) {
 // segment of a bar that continues past the week boundary passes false
 // explicitly, since the confirmed mockup keeps the live +/-/x controls
 // on the chronologically-last segment only.
-function calendarPlacedCardHtml(idea, trip, span, showControls) {
+function calendarPlacedCardHtml(idea, trip, span, showControls, isFirstSegment) {
   const isAllDay = idea.scheduled.slot === "allday";
   const controlsVisible = showControls === undefined ? true : showControls;
+  const isLastSegment = controlsVisible; // same signal: the last segment is the one showing live controls
+  const firstSegment = isFirstSegment === undefined ? true : isFirstSegment;
+  const timeLabel = placedCardTimeLabel(idea, firstSegment, isLastSegment);
   const canExtend = isAllDay ? canExtendAllDay(idea, parseLocalDate(trip.endDate)) : canExtendSlot(idea);
   const canShrink = span > 1;
 
@@ -1695,10 +1727,62 @@ function calendarPlacedCardHtml(idea, trip, span, showControls) {
          draggable="true"
          ondragstart="handleDragStart(event, '${idea.id}')"
          ondragend="handleDragEnd(event)">
-      <span class="placed-label">${activityTypeIconHtml(idea.activityType)}${escapeHtml(idea.title)}</span>
-      ${controls}
+      <div class="placed-top-row">
+        <span class="placed-label">
+          ${activityTypeIconHtml(idea.activityType)}
+          <span class="placed-title">${escapeHtml(idea.title)}</span>
+        </span>
+        ${controls}
+      </div>
+      ${timeLabel ? `<div class="placed-time-row">${escapeHtml(formatTimeShort(timeLabel))}</div>` : ""}
     </div>
   `;
+}
+
+// "HH:MM" (24hr, from <input type="time">) -> a short 12-hour label like
+// "9:30am". Falls back to the raw value if it doesn't parse (shouldn't
+// happen from a real time input, but keeps a bad/legacy value visible
+// rather than silently disappearing).
+function formatTimeShort(timeStr) {
+  if (!timeStr) return "";
+  const match = /^(\d{1,2}):(\d{2})/.exec(timeStr);
+  if (!match) return timeStr;
+  let hour = parseInt(match[1], 10);
+  const minute = match[2];
+  const suffix = hour >= 12 ? "pm" : "am";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${minute}${suffix}`;
+}
+
+// Which time (if any) a placed card shows - see product-decisions.md's
+// "Placed-card tag display + time label" (2026-09-11). Time is scoped
+// to hard commitments only, since the slot row itself already conveys
+// rough time-of-day for everything else:
+//   - Flight/Transport: departureTime. (Only one point in time is ever
+//     placed on the calendar for these today - a separate
+//     arrival-day placement is Phase 4 auto-scheduling territory.)
+//   - Lodging: checkInTime on the segment where the bar starts,
+//     checkOutTime on the segment where it ends (same segment for a
+//     single-day-wide bar). Forward-looking - Lodging isn't a
+//     droppable/schedulable slot yet (see the note at the top of this
+//     section), so this path isn't reachable from the UI until Phase 4
+//     wires up Lodging auto-placement, but it's written now so that
+//     work doesn't also have to touch this function.
+//   - Anything else: reservationTime, only if a reservation is
+//     actually needed AND a time was actually given (always optional -
+//     see the decision above).
+function placedCardTimeLabel(idea, isFirstSegment, isLastSegment) {
+  if (idea.activityType === "flight" || idea.activityType === "transport") {
+    return idea.departureTime || "";
+  }
+  if (idea.activityType === "lodging") {
+    if (isLastSegment && idea.checkOutTime) return idea.checkOutTime;
+    if (isFirstSegment && idea.checkInTime) return idea.checkInTime;
+    return "";
+  }
+  if (idea.reservationNeeded && idea.reservationTime) return idea.reservationTime;
+  return "";
 }
 
 function canExtendSlot(idea) {
