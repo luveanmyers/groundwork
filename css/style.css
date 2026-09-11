@@ -1363,6 +1363,10 @@ button.primary:active {
   position: sticky;
   top: 16px;
 }
+.calendar-sidebar.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
 .calendar-sidebar h2 {
   font-size: 1rem;
   margin: 0 0 6px;
@@ -1372,6 +1376,13 @@ button.primary:active {
   border-radius: 10px;
   padding: 10px 12px;
   margin-top: 10px;
+  cursor: grab;
+}
+.calendar-sidebar-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+.calendar-sidebar-card.dragging {
+  opacity: 0.35;
 }
 
 .calendar-grid-wrap {
@@ -1440,6 +1451,22 @@ button.primary:active {
 .cal-cell.outside-trip {
   background: none;
 }
+.cal-cell.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+/* Placed items (Step 3) are separate grid children overlaid on top of
+   the backdrop .cal-cell divs above, not nested inside them - see the
+   comment on calendarPlacedItemsHtml() in app.js for why. */
+.cal-placed-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px;
+  min-width: 0;
+  min-height: 0;
+}
 
 .cal-placed-card {
   background: var(--surface);
@@ -1447,5 +1474,65 @@ button.primary:active {
   border-radius: 6px;
   padding: 4px 6px;
   font-size: 0.78rem;
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  cursor: grab;
+}
+.cal-placed-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+.cal-placed-card.dragging {
+  opacity: 0.35;
+}
+.cal-placed-card .placed-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cal-placed-card .placed-label svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.cal-placed-card.allday-bar {
+  background: var(--tint);
+  border-color: var(--accent);
+}
+.allday-continues {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
+
+.placed-controls {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.placed-controls button {
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.8rem;
+  padding: 0;
+  cursor: pointer;
+}
+.placed-controls button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.placed-controls .remove-btn {
+  color: var(--danger);
+  border-color: var(--danger);
 }

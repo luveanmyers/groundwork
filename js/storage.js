@@ -284,10 +284,14 @@ function addIdea(tripId, input) {
     // spot there - either because it auto-placed itself (a confirmed
     // departure or check-in date) or because it was manually dragged into
     // a slot. slot is one of morning/midday/afternoon/evening/allday/
-    // lodging. Both stay null until the card is actually placed.
+    // lodging. date/slot stay null until the card is actually placed.
+    // span is how many contiguous slots (regular slot items) or days
+    // (All Day items) it stretches across via the extend/shrink controls
+    // - added Phase 3 Step 3 of the calendar port; always at least 1.
     scheduled: {
       date: (input.scheduled && input.scheduled.date) || null,
-      slot: (input.scheduled && input.scheduled.slot) || null
+      slot: (input.scheduled && input.scheduled.slot) || null,
+      span: (input.scheduled && input.scheduled.span) || 1
     },
     selected: input.selected || false,
     // A brand new idea always starts outside The Itinerary, even if
@@ -346,6 +350,28 @@ function deleteIdea(tripId, ideaId) {
   saveState(state);
 }
 
+// Dedicated setter for the scheduled sub-object - same reasoning as
+// setIdeaLocation() above: always pass the full { date, slot, span }
+// triple rather than a partial update through updateIdea(), so dragging
+// a card to a brand new spot never accidentally keeps a stale span left
+// over from wherever it was placed before.
+function scheduleIdea(tripId, ideaId, { date, slot, span }) {
+  const state = loadState();
+  const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
+  if (idea) idea.scheduled = { date, slot, span: span || 1 };
+  saveState(state);
+}
+
+// Drag a placed card back to the sidebar, or hit its remove (x) button
+// - either way it goes back to being an unscheduled Itinerary Building
+// Block, not off The Itinerary column entirely.
+function unscheduleIdea(tripId, ideaId) {
+  const state = loadState();
+  const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
+  if (idea) idea.scheduled = { date: null, slot: null, span: 1 };
+  saveState(state);
+}
+
 // One-time migration: earlier versions of this app stored a single
 // "bookingStatus" field (not_required / needed / booked) on each idea
 // instead of the current reservationNeeded/reserved/finalized fields.
@@ -396,7 +422,21 @@ function migrateIdeasInState(state) {
           arrivalTime: migrated.arrivalTime || "",
           checkInDate: migrated.checkInDate || "",
           checkOutDate: migrated.checkOutDate || "",
-          scheduled: { date: null, slot: null }
+          scheduled: { date: null, slot: null, span: 1 }
+        };
+      }
+
+      // Migration 3: cards created after `scheduled` existed but before
+      // it could hold a span (Phase 3 Step 2 vs. Step 3 of the calendar
+      // port) have scheduled.date/slot with no scheduled.span - the
+      // field that lets a placed item stretch across multiple slots or
+      // days. Backfill span: 1 so an old single-slot placement doesn't
+      // break once the extend/shrink UI starts reading it.
+      if (migrated.scheduled && migrated.scheduled.span === undefined) {
+        changed = true;
+        migrated = {
+          ...migrated,
+          scheduled: { ...migrated.scheduled, span: 1 }
         };
       }
 

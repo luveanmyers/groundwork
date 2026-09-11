@@ -1387,15 +1387,25 @@ function mapUnplottedHtml(unplotted) {
 }
 
 /* ---------------------------- Itinerary tab ---------------------------- */
-// Building-view calendar (LUV-6). Phase 3, Step 2: grid skeleton only -
-// generates the month-style week grid from the trip's own dates and shows
-// which idea cards are scheduled where. Deliberately NOT in this step:
-// dragging cards onto the grid, extend/shrink, click-to-edit, or the
-// lodging/transport gap-flagging - those are Steps 3+ of the same port.
+// Building-view calendar (LUV-6). Phase 3, Step 3: drag-and-drop
+// placement plus extend/shrink, for both regular slots and the All Day
+// row - full parity with the confirmed calendar mockup for these two
+// mechanics. Deliberately NOT in this step: click-to-edit, collision
+// warning flags, and auto-scheduling from confirmed flight/lodging
+// dates - those are Phase 4 (see product-decisions.md's "Lodging/
+// flight editing + auto-scheduling" section).
+//
+// The Lodging row stays fully inert here on purpose - dragging
+// something onto it was never actually part of the confirmed mockup
+// (its Lodging bars are hand-built HTML illustrating what AUTO
+// placement from checkInDate/checkOutDate will look like once Phase 4
+// wires that up). Building drag-and-drop for it now would mean
+// inventing an interaction nobody has reviewed.
+//
 // Grid rules (confirmed in the calendar mockup, product-decisions.md):
-// weeks start Sunday regardless of the trip's own start day, days outside
-// the trip's date range are grayed out and non-interactive, each day has
-// an All Day row, four regular slots, and a Lodging row.
+// weeks start Sunday regardless of the trip's own start day, days
+// outside the trip's date range are grayed out and non-interactive,
+// each day has an All Day row, four regular slots, and a Lodging row.
 
 const CALENDAR_SLOTS = [
   { key: "allday", label: "All day" },
@@ -1405,6 +1415,20 @@ const CALENDAR_SLOTS = [
   { key: "evening", label: "Evening" },
   { key: "lodging", label: "Lodging" }
 ];
+
+// Row each slot lands on inside .cal-grid's CSS grid (row 1 is the
+// header row, built from document order - see calendarWeekBlockHtml).
+// Kept explicit here because placed items are now positioned with an
+// inline grid-row instead of being nested inside one specific cell div
+// - that's what lets an item's box actually stretch across several
+// rows/columns for extend/shrink instead of being trapped in one cell.
+const CALENDAR_SLOT_ROWS = { allday: 2, morning: 3, midday: 4, afternoon: 5, evening: 6, lodging: 7 };
+
+// Only these four slots support the "stretch across contiguous slots
+// in one day" extend/shrink mechanic - All Day stretches across DAYS
+// instead (a different axis, handled separately below), and Lodging
+// has no interactivity at all this pass.
+const REGULAR_SLOT_KEYS = ["morning", "midday", "afternoon", "evening"];
 
 function itineraryTabHtml(trip) {
   if (!trip.startDate || !trip.endDate) {
@@ -1419,9 +1443,12 @@ function itineraryTabHtml(trip) {
 
   return `
     <div class="calendar-layout">
-      <div class="calendar-sidebar">
+      <div class="calendar-sidebar"
+           ondragover="handleSidebarDragOver(event)"
+           ondragleave="handleSidebarDragLeave(event)"
+           ondrop="handleSidebarDrop(event, '${trip.id}')">
         <h2>Itinerary Building Blocks</h2>
-        <div class="muted small">Cards in The Itinerary column without a day yet. Dragging them onto the calendar is coming in the next pass.</div>
+        <div class="muted small">Cards in The Itinerary column without a day yet. Drag one onto the calendar, or drag a placed card back here to unschedule it.</div>
         ${unscheduledIdeas.length
           ? unscheduledIdeas.map(calendarSidebarCardHtml).join("")
           : emptyStateHtml("Nothing waiting to be scheduled.")}
@@ -1435,7 +1462,10 @@ function itineraryTabHtml(trip) {
 
 function calendarSidebarCardHtml(idea) {
   return `
-    <div class="calendar-sidebar-card">
+    <div class="calendar-sidebar-card"
+         draggable="true"
+         ondragstart="handleDragStart(event, '${idea.id}')"
+         ondragend="handleDragEnd(event)">
       <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
       <div class="row-title">${escapeHtml(idea.title)}</div>
     </div>
@@ -1479,48 +1509,384 @@ function isoDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+// Given a scheduled item's start date + how many days it spans, returns
+// the array of ISO day keys it covers. Only meaningful for All Day
+// items (span there means calendar days) - a regular slot item's span
+// means slots-within-one-day, so it never needs this.
+function scheduledDateRange(startDateKey, spanDays) {
+  const start = parseLocalDate(startDateKey);
+  const days = [];
+  for (let i = 0; i < spanDays; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    days.push(isoDateKey(d));
+  }
+  return days;
+}
+
 function calendarWeekBlockHtml(week, trip, scheduledIdeas) {
   const tripStart = parseLocalDate(trip.startDate);
   const tripEnd = parseLocalDate(trip.endDate);
   const inTrip = (date) => date >= tripStart && date <= tripEnd;
 
+  // Every cell below gets an EXPLICIT grid-row/grid-column, not just the
+  // placed items further down. This isn't optional styling - as soon as
+  // one grid child has an explicit position, CSS reserves that cell
+  // first and then auto-places every other (position-less) child around
+  // it, which silently shifts the whole rest of the grid sideways. That
+  // caused a real bug: dropping one card onto the calendar pushed every
+  // cell after it in the document by one column. Explicit positions for
+  // every cell removes the auto-placement step entirely, so nothing can
+  // shift regardless of how many placed items get layered in.
   const headerCells = week
-    .map((date) => `
-      <div class="cal-day-header${inTrip(date) ? "" : " outside-trip"}">
+    .map((date, i) => `
+      <div class="cal-day-header${inTrip(date) ? "" : " outside-trip"}" style="grid-row:1; grid-column:${2 + i};">
         ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
         <span class="dow">${date.toLocaleDateString(undefined, { weekday: "short" })}</span>
       </div>`)
     .join("");
 
-  const slotRows = CALENDAR_SLOTS
+  // Backdrop cells only, one per (slot, day) - these are the real drop
+  // targets. Placed items are no longer nested inside them; see
+  // calendarPlacedItemsHtml below for why.
+  const backdropRows = CALENDAR_SLOTS
     .map((slot) => {
+      const row = CALENDAR_SLOT_ROWS[slot.key];
       const cells = week
-        .map((date) => {
-          if (!inTrip(date)) return `<div class="cal-cell outside-trip"></div>`;
+        .map((date, i) => {
+          const col = 2 + i;
+          if (!inTrip(date)) return `<div class="cal-cell outside-trip" style="grid-row:${row}; grid-column:${col};"></div>`;
           const dayKey = isoDateKey(date);
-          const items = scheduledIdeas.filter(
-            (i) => i.scheduled.date === dayKey && i.scheduled.slot === slot.key
-          );
-          return `<div class="cal-cell" data-slot="${slot.key}" data-day="${dayKey}">${items.map(calendarPlacedCardHtml).join("")}</div>`;
+          // Lodging is deliberately not a drop target this pass - see
+          // the note at the top of this section.
+          const dropAttrs = slot.key === "lodging"
+            ? ""
+            : ` ondragover="handleCalendarDragOver(event)" ondragleave="handleCalendarDragLeave(event)" ondrop="handleCalendarDrop(event, '${trip.id}', '${dayKey}', '${slot.key}')"`;
+          return `<div class="cal-cell" data-slot="${slot.key}" data-day="${dayKey}" style="grid-row:${row}; grid-column:${col};"${dropAttrs}></div>`;
         })
         .join("");
-      return `<div class="cal-row-label">${slot.label}</div>${cells}`;
+      return `<div class="cal-row-label" style="grid-row:${row}; grid-column:1;">${slot.label}</div>${cells}`;
     })
     .join("");
+
+  const weekDayKeys = week.map(isoDateKey);
+  const placedHtml = calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip);
 
   return `
     <div class="cal-week-block">
       <div class="cal-grid">
-        <div class="cal-corner"></div>
+        <div class="cal-corner" style="grid-row:1; grid-column:1;"></div>
         ${headerCells}
-        ${slotRows}
+        ${backdropRows}
+        ${placedHtml}
       </div>
     </div>
   `;
 }
 
-function calendarPlacedCardHtml(idea) {
-  return `<div class="cal-placed-card">${escapeHtml(idea.title)}</div>`;
+// Placed items are rendered as their OWN grid children (siblings of the
+// backdrop cells above, appearing after them in the markup so they
+// paint on top), each positioned with an explicit grid-row/grid-column
+// rather than nested inside one specific .cal-cell - that's what lets a
+// stretched item's box actually span multiple rows (a regular slot item
+// extended across e.g. Morning+Midday) or multiple columns (an All Day
+// item extended across several days). CSS grid items stretch to fill
+// their assigned area by default, so this "just works" with no extra
+// sizing rules.
+function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip) {
+  const parts = [];
+
+  // Regular slot items: grouped by their exact (day, slot, span)
+  // footprint, so more than one item landing in the identical spot
+  // stacks inside one wrapper instead of overlapping - per the
+  // multi-item-stacking decision (product-decisions.md, 2026-09-10).
+  const bySlotFootprint = {};
+  scheduledIdeas
+    .filter((i) => REGULAR_SLOT_KEYS.includes(i.scheduled.slot) && weekDayKeys.includes(i.scheduled.date))
+    .forEach((i) => {
+      const span = i.scheduled.span || 1;
+      const key = `${i.scheduled.date}|${i.scheduled.slot}|${span}`;
+      (bySlotFootprint[key] = bySlotFootprint[key] || []).push(i);
+    });
+
+  Object.keys(bySlotFootprint).forEach((key) => {
+    const [dayKey, slotKey, spanStr] = key.split("|");
+    const span = parseInt(spanStr, 10);
+    const col = 2 + weekDayKeys.indexOf(dayKey);
+    const row = CALENDAR_SLOT_ROWS[slotKey];
+    const items = bySlotFootprint[key];
+    // This group sits on top of its backdrop .cal-cell (later in the
+    // markup, same grid area), so it's what's actually under the
+    // cursor once a cell holds anything - without its own drop
+    // handlers here, a drop on an occupied cell fell through and did
+    // nothing (no stacking, no eviction). Same target info as the
+    // backdrop cell underneath it.
+    parts.push(`
+      <div class="cal-placed-group"
+           style="grid-column:${col}; grid-row:${row} / span ${span};"
+           ondragover="handleCalendarDragOver(event)"
+           ondragleave="handleCalendarDragLeave(event)"
+           ondrop="handleCalendarDrop(event, '${trip.id}', '${dayKey}', '${slotKey}')">
+        ${items.map((idea) => calendarPlacedCardHtml(idea, trip, span)).join("")}
+      </div>
+    `);
+  });
+
+  // All Day items: each one's full date range gets clipped to whatever
+  // part of it falls inside THIS week, so a bar spanning the week-1/
+  // week-2 boundary draws as two connected segments, one per week -
+  // matching a real month-view calendar and the confirmed mockup. The
+  // live +/-/x controls only render on the chronologically-last
+  // segment (the "growing edge").
+  scheduledIdeas
+    .filter((i) => i.scheduled.slot === "allday")
+    .forEach((idea) => {
+      const span = idea.scheduled.span || 1;
+      const fullRange = scheduledDateRange(idea.scheduled.date, span);
+      const segmentDays = fullRange.filter((d) => weekDayKeys.includes(d));
+      if (!segmentDays.length) return;
+      const col = 2 + weekDayKeys.indexOf(segmentDays[0]);
+      const isLastSegment = fullRange[fullRange.length - 1] === segmentDays[segmentDays.length - 1];
+      // Same reasoning as the regular-slot groups above - a drop
+      // anywhere on this bar targets the first day of THIS segment,
+      // same as dropping on the backdrop cell there would.
+      parts.push(`
+        <div class="cal-placed-group allday-group"
+             style="grid-column:${col} / span ${segmentDays.length}; grid-row:2;"
+             ondragover="handleCalendarDragOver(event)"
+             ondragleave="handleCalendarDragLeave(event)"
+             ondrop="handleCalendarDrop(event, '${trip.id}', '${segmentDays[0]}', 'allday')">
+          ${calendarPlacedCardHtml(idea, trip, span, isLastSegment)}
+        </div>
+      `);
+    });
+
+  return parts.join("");
+}
+
+// showControls defaults to true (the normal case: a regular slot item,
+// or the only/last segment of an All Day bar). An earlier week's
+// segment of a bar that continues past the week boundary passes false
+// explicitly, since the confirmed mockup keeps the live +/-/x controls
+// on the chronologically-last segment only.
+function calendarPlacedCardHtml(idea, trip, span, showControls) {
+  const isAllDay = idea.scheduled.slot === "allday";
+  const controlsVisible = showControls === undefined ? true : showControls;
+  const canExtend = isAllDay ? canExtendAllDay(idea, parseLocalDate(trip.endDate)) : canExtendSlot(idea);
+  const canShrink = span > 1;
+
+  const controls = controlsVisible
+    ? `
+      <div class="placed-controls">
+        <button type="button" draggable="false" class="shrink-btn" title="Shrink" ${canShrink ? "" : "disabled"}
+          onclick="event.stopPropagation(); handleShrinkScheduled('${trip.id}', '${idea.id}')">&minus;</button>
+        <button type="button" draggable="false" class="extend-btn" title="Extend" ${canExtend ? "" : "disabled"}
+          onclick="event.stopPropagation(); handleExtendScheduled('${trip.id}', '${idea.id}')">+</button>
+        <button type="button" draggable="false" class="remove-btn" title="Remove from calendar"
+          onclick="event.stopPropagation(); handleUnscheduleIdea('${trip.id}', '${idea.id}')">&times;</button>
+      </div>
+    `
+    : isAllDay
+      ? `<span class="allday-continues">&rarr;</span>`
+      : "";
+
+  return `
+    <div class="cal-placed-card${isAllDay ? " allday-bar" : ""}"
+         draggable="true"
+         ondragstart="handleDragStart(event, '${idea.id}')"
+         ondragend="handleDragEnd(event)">
+      <span class="placed-label">${activityTypeIconHtml(idea.activityType)}${escapeHtml(idea.title)}</span>
+      ${controls}
+    </div>
+  `;
+}
+
+function canExtendSlot(idea) {
+  const rowIndex = REGULAR_SLOT_KEYS.indexOf(idea.scheduled.slot);
+  const span = idea.scheduled.span || 1;
+  return rowIndex !== -1 && rowIndex + span < REGULAR_SLOT_KEYS.length;
+}
+
+function canExtendAllDay(idea, tripEndDate) {
+  const span = idea.scheduled.span || 1;
+  const range = scheduledDateRange(idea.scheduled.date, span + 1);
+  return parseLocalDate(range[range.length - 1]) <= tripEndDate;
+}
+
+// Rows (indices into REGULAR_SLOT_KEYS) a regular-slot-scheduled idea
+// currently covers. Empty for anything not on a regular slot (All Day,
+// Lodging, or unscheduled).
+function regularSlotRowsCovered(idea) {
+  if (!idea.scheduled.date || !REGULAR_SLOT_KEYS.includes(idea.scheduled.slot)) return [];
+  const start = REGULAR_SLOT_KEYS.indexOf(idea.scheduled.slot);
+  const span = idea.scheduled.span || 1;
+  const rows = [];
+  for (let i = 0; i < span; i++) rows.push(start + i);
+  return rows;
+}
+
+// Two footprints "collide" if they share at least one row but aren't
+// identical. An identical footprint (same date, same start slot, same
+// span) is the deliberate two-activities-share-one-block stacking case
+// (see the multi-item stacking decision, product-decisions.md,
+// 2026-09-10) and must never be evicted - only a genuine partial
+// overlap should be.
+function rowsOverlapButDiffer(rowsA, rowsB) {
+  if (!rowsA.length || !rowsB.length) return false;
+  const sameSet = rowsA.length === rowsB.length && rowsA.every((r) => rowsB.includes(r));
+  if (sameSet) return false;
+  return rowsA.some((r) => rowsB.includes(r));
+}
+
+// Finds every OTHER regular-slot idea on the same date whose footprint
+// overlaps (but doesn't exactly match) the given rows, and unschedules
+// each one - back to the Itinerary Building Blocks sidebar, rather
+// than leaving it sitting invisibly underneath whatever now covers its
+// slot. See the 2026-09-12 "evict on overlap" decision (product-
+// decisions.md) - this replaced silently hiding one card behind the
+// other, which is what extending into an occupied neighbor used to do.
+function evictOverlappingRegularSlotIdeas(tripId, exceptIdeaId, dateKey, rows) {
+  getIdeas(tripId).forEach((other) => {
+    if (other.id === exceptIdeaId) return;
+    if (other.scheduled.date !== dateKey) return;
+    const otherRows = regularSlotRowsCovered(other);
+    if (rowsOverlapButDiffer(rows, otherRows)) {
+      unscheduleIdea(tripId, other.id);
+    }
+  });
+}
+
+// Same idea, for All Day items - "rows" become calendar days instead
+// of slot rows.
+function evictOverlappingAllDayIdeas(tripId, exceptIdeaId, days) {
+  getIdeas(tripId).forEach((other) => {
+    if (other.id === exceptIdeaId) return;
+    if (other.scheduled.slot !== "allday" || !other.scheduled.date) return;
+    const otherDays = scheduledDateRange(other.scheduled.date, other.scheduled.span || 1);
+    const sameSet = days.length === otherDays.length && days.every((d) => otherDays.includes(d));
+    if (sameSet) return;
+    if (days.some((d) => otherDays.includes(d))) {
+      unscheduleIdea(tripId, other.id);
+    }
+  });
+}
+
+/* ---- Calendar drag-and-drop + extend/shrink handlers ---- */
+// Reuses the same draggedIdeaId / handleDragStart / handleDragEnd
+// already defined above for the kanban board - the Ideas and Itinerary
+// tabs are never both on screen at once, so there's no risk of the two
+// drag systems colliding, and it's one less thing to keep in sync.
+
+function handleCalendarDragOver(event) {
+  if (!draggedIdeaId) return;
+  event.preventDefault();
+  event.currentTarget.classList.add("drag-over");
+}
+
+function handleCalendarDragLeave(event) {
+  event.currentTarget.classList.remove("drag-over");
+}
+
+function handleCalendarDrop(event, tripId, dayKey, slotKey) {
+  event.preventDefault();
+  event.currentTarget.classList.remove("drag-over");
+  if (!draggedIdeaId) return;
+
+  const idea = getIdeas(tripId).find((i) => i.id === draggedIdeaId);
+  if (!idea) return;
+
+  const wasPlaced = !!idea.scheduled.date;
+  const wasAllDay = idea.scheduled.slot === "allday";
+  const droppingOnAllDay = slotKey === "allday";
+
+  // An already-placed All Day bar can only move to another All Day
+  // cell - dropping it onto a single slot doesn't mean anything and is
+  // ignored outright, matching the confirmed mockup.
+  if (wasPlaced && wasAllDay && !droppingOnAllDay) return;
+
+  let span = 1;
+  if (wasPlaced && wasAllDay && droppingOnAllDay) {
+    // Moving an existing All Day bar to a new start day keeps its
+    // length, as long as the trip has enough days left from that point
+    // - otherwise this is a silent no-op. (Auto-shrink-to-fit instead
+    // of no-op is still an open question - see product-decisions.md.)
+    const trip = getActiveTrip();
+    const existingSpan = idea.scheduled.span || 1;
+    const range = scheduledDateRange(dayKey, existingSpan);
+    if (parseLocalDate(range[range.length - 1]) > parseLocalDate(trip.endDate)) return;
+    span = existingSpan;
+  }
+  // Any other case - a fresh sidebar card, a regular-slot placed card
+  // being moved to a new slot/day, or a placed card being moved onto
+  // All Day - always starts fresh at span 1. Re-extend afterward if
+  // needed, matching the confirmed mockup.
+
+  // Landing on a slot that's already (partly) covered by a DIFFERENT
+  // idea evicts that idea back to the sidebar, unless its footprint is
+  // an exact match (two activities sharing one block on purpose). See
+  // the 2026-09-12 "evict on overlap" decision.
+  if (droppingOnAllDay) {
+    evictOverlappingAllDayIdeas(tripId, draggedIdeaId, scheduledDateRange(dayKey, span));
+  } else {
+    evictOverlappingRegularSlotIdeas(tripId, draggedIdeaId, dayKey, [REGULAR_SLOT_KEYS.indexOf(slotKey)]);
+  }
+
+  scheduleIdea(tripId, draggedIdeaId, { date: dayKey, slot: slotKey, span });
+  renderTabContent(getActiveTrip());
+}
+
+function handleSidebarDragOver(event) {
+  if (!draggedIdeaId) return;
+  event.preventDefault();
+  event.currentTarget.classList.add("drag-over");
+}
+
+function handleSidebarDragLeave(event) {
+  event.currentTarget.classList.remove("drag-over");
+}
+
+function handleSidebarDrop(event, tripId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove("drag-over");
+  if (!draggedIdeaId) return;
+  unscheduleIdea(tripId, draggedIdeaId);
+  renderTabContent(getActiveTrip());
+}
+
+function handleExtendScheduled(tripId, ideaId) {
+  const idea = getIdeas(tripId).find((i) => i.id === ideaId);
+  const trip = getActiveTrip();
+  if (!idea || !trip || !idea.scheduled.date) return;
+  const span = idea.scheduled.span || 1;
+
+  if (idea.scheduled.slot === "allday") {
+    if (!canExtendAllDay(idea, parseLocalDate(trip.endDate))) return;
+    const newDays = scheduledDateRange(idea.scheduled.date, span + 1);
+    evictOverlappingAllDayIdeas(tripId, ideaId, newDays);
+    scheduleIdea(tripId, ideaId, { date: idea.scheduled.date, slot: "allday", span: span + 1 });
+  } else {
+    if (!canExtendSlot(idea)) return;
+    const startRow = REGULAR_SLOT_KEYS.indexOf(idea.scheduled.slot);
+    const newRows = [];
+    for (let i = 0; i < span + 1; i++) newRows.push(startRow + i);
+    evictOverlappingRegularSlotIdeas(tripId, ideaId, idea.scheduled.date, newRows);
+    scheduleIdea(tripId, ideaId, { date: idea.scheduled.date, slot: idea.scheduled.slot, span: span + 1 });
+  }
+  renderTabContent(getActiveTrip());
+}
+
+function handleShrinkScheduled(tripId, ideaId) {
+  const idea = getIdeas(tripId).find((i) => i.id === ideaId);
+  if (!idea || !idea.scheduled.date) return;
+  const span = idea.scheduled.span || 1;
+  if (span <= 1) return;
+  scheduleIdea(tripId, ideaId, { date: idea.scheduled.date, slot: idea.scheduled.slot, span: span - 1 });
+  renderTabContent(getActiveTrip());
+}
+
+function handleUnscheduleIdea(tripId, ideaId) {
+  unscheduleIdea(tripId, ideaId);
+  renderTabContent(getActiveTrip());
 }
 
 /* ----------------------------- Packing tab ----------------------------- */
