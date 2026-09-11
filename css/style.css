@@ -1339,3 +1339,113 @@ button.primary:active {
   inset: 0;
   z-index: 9;
 }
+
+/* -------------------- Building-view calendar (LUV-6) -------------------- */
+/* Phase 3, Step 2: grid skeleton only. Structure/spacing only - colors
+   reuse existing tokens (per style-reference-provisional.md, real palette
+   work waits until data layer + functionality are finalized). Desktop-first,
+   like the rest of Ideation/Planning/Building - not yet tested at mobile
+   width (see the same open item already logged for the kanban board). */
+
+.calendar-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.calendar-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  position: sticky;
+  top: 16px;
+}
+.calendar-sidebar h2 {
+  font-size: 1rem;
+  margin: 0 0 6px;
+}
+.calendar-sidebar-card {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.calendar-grid-wrap {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.cal-week-block {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+.cal-week-block:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+.cal-week-block:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: 90px repeat(7, minmax(110px, 1fr));
+  gap: 6px;
+}
+
+.cal-corner {
+  /* empty top-left cell above the row labels */
+}
+
+.cal-day-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  padding: 6px 4px;
+}
+.cal-day-header .dow {
+  display: block;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+.cal-day-header.outside-trip {
+  color: var(--ink-faint);
+}
+
+.cal-row-label {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.cal-cell {
+  background: var(--surface-2);
+  border-radius: 8px;
+  min-height: 48px;
+  padding: 4px;
+}
+.cal-cell.outside-trip {
+  background: none;
+}
+
+.cal-placed-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+}

@@ -1387,14 +1387,140 @@ function mapUnplottedHtml(unplotted) {
 }
 
 /* ---------------------------- Itinerary tab ---------------------------- */
-// The old generic type/title/date/time itinerary list + form lived here.
-// Removed 2026-09-09 (Phase 3, Step 1 of the calendar port) - Flight/Lodging/
-// Transport now flow through idea cards (see the kanban/ideas system), and
-// this tab is being rebuilt as the real Building-view month calendar
-// (LUV-6). This stub is a placeholder until that grid lands.
+// Building-view calendar (LUV-6). Phase 3, Step 2: grid skeleton only -
+// generates the month-style week grid from the trip's own dates and shows
+// which idea cards are scheduled where. Deliberately NOT in this step:
+// dragging cards onto the grid, extend/shrink, click-to-edit, or the
+// lodging/transport gap-flagging - those are Steps 3+ of the same port.
+// Grid rules (confirmed in the calendar mockup, product-decisions.md):
+// weeks start Sunday regardless of the trip's own start day, days outside
+// the trip's date range are grayed out and non-interactive, each day has
+// an All Day row, four regular slots, and a Lodging row.
+
+const CALENDAR_SLOTS = [
+  { key: "allday", label: "All day" },
+  { key: "morning", label: "Morning" },
+  { key: "midday", label: "Midday" },
+  { key: "afternoon", label: "Afternoon" },
+  { key: "evening", label: "Evening" },
+  { key: "lodging", label: "Lodging" }
+];
 
 function itineraryTabHtml(trip) {
-  return emptyStateHtml("The Building-view calendar is under construction - check back soon.");
+  if (!trip.startDate || !trip.endDate) {
+    return emptyStateHtml("Add a start and end date to this trip before building its calendar.");
+  }
+
+  const itineraryIdeas = getIdeas(trip.id).filter((i) => columnKeyForIdea(i) === "itinerary");
+  const scheduledIdeas = itineraryIdeas.filter((i) => i.scheduled && i.scheduled.date);
+  const unscheduledIdeas = itineraryIdeas.filter((i) => !(i.scheduled && i.scheduled.date));
+
+  const weeks = calendarWeeksForTrip(trip.startDate, trip.endDate);
+
+  return `
+    <div class="calendar-layout">
+      <div class="calendar-sidebar">
+        <h2>Itinerary Building Blocks</h2>
+        <div class="muted small">Cards in The Itinerary column without a day yet. Dragging them onto the calendar is coming in the next pass.</div>
+        ${unscheduledIdeas.length
+          ? unscheduledIdeas.map(calendarSidebarCardHtml).join("")
+          : emptyStateHtml("Nothing waiting to be scheduled.")}
+      </div>
+      <div class="calendar-grid-wrap">
+        ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function calendarSidebarCardHtml(idea) {
+  return `
+    <div class="calendar-sidebar-card">
+      <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+      <div class="row-title">${escapeHtml(idea.title)}</div>
+    </div>
+  `;
+}
+
+// Returns an array of weeks (Sunday-Saturday) covering the trip's full
+// date range, padded at both ends to a full week the same way a real
+// month-view calendar does.
+function calendarWeeksForTrip(startDate, endDate) {
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+
+  const gridStart = new Date(start);
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+
+  const gridEnd = new Date(end);
+  gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
+
+  const weeks = [];
+  let cursor = new Date(gridStart);
+  while (cursor <= gridEnd) {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+// "2026-10-12" -> local Date at midnight, without the UTC-shift bug you
+// get from `new Date("2026-10-12")` in some timezones.
+function parseLocalDate(isoDate) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function isoDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function calendarWeekBlockHtml(week, trip, scheduledIdeas) {
+  const tripStart = parseLocalDate(trip.startDate);
+  const tripEnd = parseLocalDate(trip.endDate);
+  const inTrip = (date) => date >= tripStart && date <= tripEnd;
+
+  const headerCells = week
+    .map((date) => `
+      <div class="cal-day-header${inTrip(date) ? "" : " outside-trip"}">
+        ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+        <span class="dow">${date.toLocaleDateString(undefined, { weekday: "short" })}</span>
+      </div>`)
+    .join("");
+
+  const slotRows = CALENDAR_SLOTS
+    .map((slot) => {
+      const cells = week
+        .map((date) => {
+          if (!inTrip(date)) return `<div class="cal-cell outside-trip"></div>`;
+          const dayKey = isoDateKey(date);
+          const items = scheduledIdeas.filter(
+            (i) => i.scheduled.date === dayKey && i.scheduled.slot === slot.key
+          );
+          return `<div class="cal-cell" data-slot="${slot.key}" data-day="${dayKey}">${items.map(calendarPlacedCardHtml).join("")}</div>`;
+        })
+        .join("");
+      return `<div class="cal-row-label">${slot.label}</div>${cells}`;
+    })
+    .join("");
+
+  return `
+    <div class="cal-week-block">
+      <div class="cal-grid">
+        <div class="cal-corner"></div>
+        ${headerCells}
+        ${slotRows}
+      </div>
+    </div>
+  `;
+}
+
+function calendarPlacedCardHtml(idea) {
+  return `<div class="cal-placed-card">${escapeHtml(idea.title)}</div>`;
 }
 
 /* ----------------------------- Packing tab ----------------------------- */
