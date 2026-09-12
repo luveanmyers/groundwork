@@ -1641,3 +1641,28 @@ button.primary:active {
   flex-direction: column;
   gap: 10px;
 }
+
+/* Lodging bars (LUV-7 Step 2) - fully auto-scheduled, never manually
+   dragged (the Lodging row has been locked in as non-interactive
+   since Phase 3). Reuses .allday-bar's tinted treatment since it's
+   visually the same "multi-day bar" idea, but overrides the cursor -
+   "grab" would be misleading on something that can't actually be
+   dragged. */
+.cal-placed-card.lodging-bar {
+  cursor: pointer;
+}
+
+/* A cross-day flight/transport's derived arrival echo - never a real
+   placement (see product-decisions.md's "Phase 4, Step 2"), so it
+   reads visually distinct from a real placed card: dashed border,
+   muted, no drag affordance. Still clickable (pointer cursor) since
+   it opens the same idea's edit popover. */
+.cal-placed-card.cal-arrival-echo {
+  cursor: pointer;
+  border-style: dashed;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+}
+.cal-placed-card.cal-arrival-echo .placed-title {
+  font-style: italic;
+}

@@ -55,6 +55,14 @@ let draggedIdeaId = null;
 // is fine since it's just "what's open right now," not saved data.
 let openCalendarPopoverIdeaId = null;
 
+// Which specific rendered DOM element the open popover is anchored
+// to - needed because a single idea can now render in TWO places at
+// once (a cross-day flight's real departure card, plus its derived
+// arrival echo - see calendarArrivalEchoHtml() below). Positioning by
+// idea id alone would always find the FIRST matching element in the
+// DOM regardless of which one was actually clicked.
+let openCalendarPopoverAnchorKey = null;
+
 // Whether the "Add an idea" form is currently open. Same reasoning as
 // above - the form used to always sit at the bottom of the page, which
 // felt heavy; now it's tucked behind a "+ Add idea" button and this
@@ -1050,6 +1058,15 @@ function moveIdeaToColumn(tripId, ideaId, columnKey) {
     updates.reserved = false;
   }
 
+  // Fixed 2026-09-12 (LUV-7 Step 2): leaving The Itinerary used to
+  // leave the card's calendar placement (scheduled) untouched - it
+  // just became invisible, filtered out of the calendar view, rather
+  // than actually clearing. A card moved back in later would then
+  // start from a stale placement instead of a clean slate.
+  if (currentColumn === "itinerary" && columnKey !== "itinerary") {
+    unscheduleIdea(tripId, ideaId);
+  }
+
   updateIdea(tripId, ideaId, updates);
   renderTabContent(getActiveTrip());
 }
@@ -1472,10 +1489,164 @@ const CALENDAR_SLOT_ROWS = { allday: 2, morning: 3, midday: 4, afternoon: 5, eve
 // has no interactivity at all this pass.
 const REGULAR_SLOT_KEYS = ["morning", "midday", "afternoon", "evening"];
 
+/* ---- Auto-scheduling (LUV-7 Step 2) ---- */
+// "Confirmed date/time always wins" (product-decisions.md, 2026-09-12)
+// - Flight/Transport/Lodging cards with a real, confirmed date auto-
+// place onto the calendar rather than requiring a manual drag. Scoped
+// to these three types only: a plain activity's reservationTime has
+// no paired date field, so there's structurally nothing to place it
+// against (see "Phase 4, Step 2" in product-decisions.md).
+const AUTO_SCHEDULE_TYPES = ["flight", "transport", "lodging"];
+
+// Time-of-day cutoffs for placing a Flight/Transport departure/arrival
+// into a slot (confirmed 2026-09-12 - the mockup's own cutoffs were
+// explicitly illustrative, not locked). "HH:MM" 24hr, from
+// <input type="time">.
+function slotForTime(timeStr) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(timeStr || "");
+  if (!match) return null;
+  const hour = parseInt(match[1], 10);
+  if (hour < 11) return "morning";
+  if (hour < 14) return "midday";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+function daysBetweenDates(startIso, endIso) {
+  const start = parseLocalDate(startIso);
+  const end = parseLocalDate(endIso);
+  return Math.round((end - start) / (1000 * 60 * 60 * 24));
+}
+
+// Computes where an idea SHOULD sit on the calendar right now, purely
+// from its own confirmed fields - never reads or depends on its
+// current idea.scheduled value. Returns null if this idea's type
+// doesn't auto-schedule, or if it does but the required fields aren't
+// filled in yet (in which case syncAutoScheduledIdeas() below
+// unschedules it rather than leaving a stale placement).
+function computeAutoSchedule(idea) {
+  if (idea.activityType === "lodging") {
+    if (!idea.checkInDate || !idea.checkOutDate) return null;
+    // Span is inclusive of BOTH the check-in and check-out calendar
+    // days (a 3-night stay, check in Mon/check out Thu, shows as a
+    // 4-day-wide bar) - matches the display logic already written for
+    // which segment shows checkInTime vs checkOutTime (see
+    // placedCardTimeLabel below), confirmed in product-decisions.md.
+    const span = daysBetweenDates(idea.checkInDate, idea.checkOutDate) + 1;
+    if (span < 1) return null; // checkout on/before checkin - invalid range, nothing sensible to place
+    return { date: idea.checkInDate, slot: "lodging", span };
+  }
+
+  if (idea.activityType === "flight" || idea.activityType === "transport") {
+    if (!idea.departureDate || !idea.departureTime) return null;
+    const departureSlot = slotForTime(idea.departureTime);
+    if (!departureSlot) return null;
+
+    // Same-day arrival with a known time: a real spanning bar from
+    // departure slot through arrival slot, reusing the existing
+    // regular-slot extend mechanic directly (cheap - see
+    // product-decisions.md's "Phase 4, Step 2"). Cross-day arrivals
+    // are NOT handled here - see crossDayArrivalEchoes() below for why
+    // that's a derived echo instead of a second real placement.
+    if (idea.arrivalDate && idea.arrivalTime && idea.arrivalDate === idea.departureDate) {
+      const arrivalSlot = slotForTime(idea.arrivalTime);
+      if (arrivalSlot) {
+        const depIdx = REGULAR_SLOT_KEYS.indexOf(departureSlot);
+        const arrIdx = REGULAR_SLOT_KEYS.indexOf(arrivalSlot);
+        const span = Math.max(1, arrIdx - depIdx + 1);
+        return { date: idea.departureDate, slot: departureSlot, span };
+      }
+    }
+
+    return { date: idea.departureDate, slot: departureSlot, span: 1 };
+  }
+
+  return null;
+}
+
+// Corrects drift between what's stored (idea.scheduled) and what the
+// confirmed fields actually say, for every Flight/Transport/Lodging
+// card in The Itinerary. Deliberately called from itineraryTabHtml()
+// itself (a render function) rather than hunting down every place a
+// relevant field could change - the kanban card's inline-edit body,
+// the calendar popover, AND moving a card into The Itinerary all could
+// change these fields, and a render-time sync guarantees "confirmed
+// data always wins" stays true no matter which path caused the
+// change, without needing a hook at each one individually. This is a
+// deliberate, narrow exception to "render functions only read data,
+// they don't write it" (see this file's header comment) - flagged
+// here so it doesn't look like an oversight if it's ever ported
+// elsewhere.
+//
+// Never touches a plain activity's manually-set idea.scheduled -
+// computeAutoSchedule() only returns non-null for the three
+// auto-schedule types, so anything else is filtered out before this
+// function ever looks at it.
+function syncAutoScheduledIdeas(tripId, itineraryIdeas) {
+  itineraryIdeas
+    .filter((idea) => AUTO_SCHEDULE_TYPES.includes(idea.activityType))
+    .forEach((idea) => {
+      const target = computeAutoSchedule(idea);
+      const current = idea.scheduled;
+      const isScheduled = !!(current && current.date);
+
+      if (!target) {
+        // Required confirmed fields are missing (or got cleared) - if
+        // this was previously auto-placed, send it back to the
+        // sidebar rather than leaving a stale placement.
+        if (isScheduled) unscheduleIdea(tripId, idea.id);
+        return;
+      }
+
+      const changed =
+        !isScheduled ||
+        current.date !== target.date ||
+        current.slot !== target.slot ||
+        current.span !== target.span;
+      if (changed) scheduleIdea(tripId, idea.id, target);
+    });
+}
+
+// Cross-day Flight/Transport arrivals: NOT a second real placement
+// (see computeAutoSchedule above and product-decisions.md's "Phase 4,
+// Step 2" for why - the calendar's grid can't express a bar bending
+// across both a day boundary and a slot boundary without a rebuild).
+// Instead, a derived, read-only visual echo on the arrival day -
+// computed live here from arrivalDate/arrivalTime, never persisted,
+// never draggable, never part of collision/eviction/extend-shrink.
+// Only shown when arrivalDate differs from departureDate (same-day
+// arrivals already get the real spanning bar above) and arrivalTime
+// is set (no time means no slot to place it in).
+function crossDayArrivalEchoes(itineraryIdeas) {
+  return itineraryIdeas
+    .filter(
+      (i) =>
+        (i.activityType === "flight" || i.activityType === "transport") &&
+        i.arrivalDate &&
+        i.arrivalTime &&
+        i.arrivalDate !== i.departureDate
+    )
+    .map((idea) => {
+      const slot = slotForTime(idea.arrivalTime);
+      return slot ? { idea, date: idea.arrivalDate, slot } : null;
+    })
+    .filter(Boolean);
+}
+
 function itineraryTabHtml(trip) {
   if (!trip.startDate || !trip.endDate) {
     return emptyStateHtml("Add a start and end date to this trip before building its calendar.");
   }
+
+  // Corrects any Flight/Transport/Lodging card's placement against its
+  // own confirmed fields before anything below reads it - see
+  // syncAutoScheduledIdeas() above for why this runs here rather than
+  // at each individual edit path. scheduleIdea()/unscheduleIdea() do
+  // their own separate loadState()/saveState() round trip, so
+  // itineraryIdeas has to be (re)fetched AFTER this call to see
+  // whatever it just corrected - re-using the pre-sync array here
+  // would silently render stale placements for a render or two.
+  syncAutoScheduledIdeas(trip.id, getIdeas(trip.id).filter((i) => columnKeyForIdea(i) === "itinerary"));
 
   const itineraryIdeas = getIdeas(trip.id).filter((i) => columnKeyForIdea(i) === "itinerary");
   const scheduledIdeas = itineraryIdeas.filter((i) => i.scheduled && i.scheduled.date);
@@ -1506,7 +1677,7 @@ function itineraryTabHtml(trip) {
           : emptyStateHtml("Nothing waiting to be scheduled.")}
       </div>
       <div class="calendar-grid-wrap">
-        ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas)).join("")}
+        ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas)).join("")}
       </div>
       ${openPopoverIdea ? calendarEditPopoverHtml(trip, openPopoverIdea) : ""}
     </div>
@@ -1550,14 +1721,16 @@ function calendarEditPopoverHtml(trip, idea) {
   `;
 }
 
-function handleOpenCalendarPopover(event, tripId, ideaId) {
+function handleOpenCalendarPopover(event, tripId, ideaId, anchorKey) {
   event.stopPropagation();
   openCalendarPopoverIdeaId = ideaId;
+  openCalendarPopoverAnchorKey = anchorKey;
   renderTabContent(getActiveTrip());
 }
 
 function handleCloseCalendarPopover() {
   openCalendarPopoverIdeaId = null;
+  openCalendarPopoverAnchorKey = null;
   renderTabContent(getActiveTrip());
 }
 
@@ -1580,8 +1753,8 @@ function handleCloseCalendarPopover() {
 function positionCalendarPopover() {
   const pop = document.getElementById("cal-edit-popover");
   if (!pop) return;
-  const anchor = document.querySelector(`[data-idea-id="${openCalendarPopoverIdeaId}"]`);
-  if (!anchor) { openCalendarPopoverIdeaId = null; return; }
+  const anchor = document.querySelector(`[data-popover-anchor="${openCalendarPopoverAnchorKey}"]`);
+  if (!anchor) { openCalendarPopoverIdeaId = null; openCalendarPopoverAnchorKey = null; return; }
 
   const r = anchor.getBoundingClientRect();
   let top = r.bottom + 8;
@@ -1687,7 +1860,7 @@ function scheduledDateRange(startDateKey, spanDays) {
   return days;
 }
 
-function calendarWeekBlockHtml(week, trip, scheduledIdeas) {
+function calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas) {
   const tripStart = parseLocalDate(trip.startDate);
   const tripEnd = parseLocalDate(trip.endDate);
   const inTrip = (date) => date >= tripStart && date <= tripEnd;
@@ -1733,7 +1906,7 @@ function calendarWeekBlockHtml(week, trip, scheduledIdeas) {
     .join("");
 
   const weekDayKeys = week.map(isoDateKey);
-  const placedHtml = calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip);
+  const placedHtml = calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIdeas);
 
   return `
     <div class="cal-week-block">
@@ -1756,7 +1929,7 @@ function calendarWeekBlockHtml(week, trip, scheduledIdeas) {
 // item extended across several days). CSS grid items stretch to fill
 // their assigned area by default, so this "just works" with no extra
 // sizing rules.
-function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip) {
+function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIdeas) {
   const parts = [];
 
   // Regular slot items: grouped by their exact (day, slot, span)
@@ -1825,22 +1998,87 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip) {
       `);
     });
 
+  // Lodging items: same multi-day segment-clipping treatment as All
+  // Day items above (a stay spanning the week-1/week-2 boundary draws
+  // as two connected segments). Fully auto-scheduled (see
+  // syncAutoScheduledIdeas above) and deliberately non-interactive -
+  // no drag, no extend/shrink/remove controls - matching the locked-in
+  // "the Lodging row is non-interactive" decision. Still clickable to
+  // open the edit popover, same as every other placed card type.
+  scheduledIdeas
+    .filter((i) => i.scheduled.slot === "lodging")
+    .forEach((idea) => {
+      const span = idea.scheduled.span || 1;
+      const fullRange = scheduledDateRange(idea.scheduled.date, span);
+      const segmentDays = fullRange.filter((d) => weekDayKeys.includes(d));
+      if (!segmentDays.length) return;
+      const col = 2 + weekDayKeys.indexOf(segmentDays[0]);
+      const isFirstSegment = fullRange[0] === segmentDays[0];
+      const isLastSegment = fullRange[fullRange.length - 1] === segmentDays[segmentDays.length - 1];
+      parts.push(`
+        <div class="cal-placed-group lodging-group" style="grid-column:${col} / span ${segmentDays.length}; grid-row:${CALENDAR_SLOT_ROWS.lodging};">
+          ${calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment, false)}
+        </div>
+      `);
+    });
+
+  // Cross-day Flight/Transport arrival echoes - derived, read-only
+  // markers on the arrival day (see crossDayArrivalEchoes() and
+  // product-decisions.md's "Phase 4, Step 2"). Deliberately grouped
+  // separately from the real scheduled items above rather than merged
+  // into bySlotFootprint - an echo never evicts or gets evicted, and
+  // in the rare case its slot exactly coincides with a differently-
+  // spanned real item, the two can visually overlap. Known, accepted
+  // edge case - cheap to revisit once real trip data shows whether
+  // it's actually a problem in practice.
+  const echoesByFootprint = {};
+  crossDayArrivalEchoes(itineraryIdeas)
+    .filter((e) => weekDayKeys.includes(e.date))
+    .forEach((e) => {
+      const key = `${e.date}|${e.slot}`;
+      (echoesByFootprint[key] = echoesByFootprint[key] || []).push(e.idea);
+    });
+  Object.keys(echoesByFootprint).forEach((key) => {
+    const [dayKey, slotKey] = key.split("|");
+    const col = 2 + weekDayKeys.indexOf(dayKey);
+    const row = CALENDAR_SLOT_ROWS[slotKey];
+    const ideas = echoesByFootprint[key];
+    parts.push(`
+      <div class="cal-placed-group echo-group" style="grid-column:${col}; grid-row:${row};">
+        ${ideas.map((idea) => calendarArrivalEchoHtml(idea, trip)).join("")}
+      </div>
+    `);
+  });
+
   return parts.join("");
 }
 
-// showControls defaults to true (the normal case: a regular slot item,
-// or the only/last segment of an All Day bar). An earlier week's
-// segment of a bar that continues past the week boundary passes false
-// explicitly, since the confirmed mockup keeps the live +/-/x controls
-// on the chronologically-last segment only.
-function calendarPlacedCardHtml(idea, trip, span, showControls, isFirstSegment) {
-  const isAllDay = idea.scheduled.slot === "allday";
-  const controlsVisible = showControls === undefined ? true : showControls;
-  const isLastSegment = controlsVisible; // same signal: the last segment is the one showing live controls
+// isLastSegment defaults to true (the normal case: a regular slot
+// item, or the only/last segment of a multi-day bar). An earlier
+// week's segment of a bar that continues past the week boundary
+// passes false explicitly, since the confirmed mockup keeps the live
+// +/-/x controls on the chronologically-last segment only.
+//
+// interactive defaults to true; Lodging bars pass false (see
+// calendarPlacedItemsHtml above) - deliberately kept as its OWN
+// parameter rather than reusing isLastSegment for both jobs, since a
+// non-interactive multi-day bar (Lodging) still needs isLastSegment
+// computed correctly for its OWN purpose (which segment shows
+// checkOutTime vs checkInTime, see placedCardTimeLabel below) even
+// though it never shows controls on any segment.
+function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment, interactive) {
+  const slotKey = idea.scheduled.slot;
+  const isMultiDayBar = slotKey === "allday" || slotKey === "lodging";
+  const lastSegment = isLastSegment === undefined ? true : isLastSegment;
   const firstSegment = isFirstSegment === undefined ? true : isFirstSegment;
-  const timeLabel = placedCardTimeLabel(idea, firstSegment, isLastSegment);
-  const canExtend = isAllDay ? canExtendAllDay(idea, parseLocalDate(trip.endDate)) : canExtendSlot(idea);
-  const canShrink = span > 1;
+  const isInteractive = interactive === undefined ? true : interactive;
+  const timeLabel = placedCardTimeLabel(idea, firstSegment, lastSegment);
+
+  const controlsVisible = isInteractive && lastSegment;
+  const canExtend = controlsVisible
+    ? (slotKey === "allday" ? canExtendAllDay(idea, parseLocalDate(trip.endDate)) : canExtendSlot(idea))
+    : false;
+  const canShrink = controlsVisible && span > 1;
 
   const controls = controlsVisible
     ? `
@@ -1853,17 +2091,19 @@ function calendarPlacedCardHtml(idea, trip, span, showControls, isFirstSegment) 
           onclick="event.stopPropagation(); handleUnscheduleIdea('${trip.id}', '${idea.id}')">&times;</button>
       </div>
     `
-    : isAllDay
+    : isMultiDayBar && !lastSegment
       ? `<span class="allday-continues">&rarr;</span>`
       : "";
 
+  const dragAttrs = isInteractive
+    ? `draggable="true" ondragstart="handleDragStart(event, '${idea.id}')" ondragend="handleDragEnd(event)"`
+    : `draggable="false"`;
+
   return `
-    <div class="cal-placed-card${isAllDay ? " allday-bar" : ""}"
-         data-idea-id="${idea.id}"
-         draggable="true"
-         ondragstart="handleDragStart(event, '${idea.id}')"
-         ondragend="handleDragEnd(event)"
-         onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}')">
+    <div class="cal-placed-card${isMultiDayBar ? " allday-bar" : ""}${slotKey === "lodging" ? " lodging-bar" : ""}"
+         data-popover-anchor="${idea.id}"
+         ${dragAttrs}
+         onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}', '${idea.id}')">
       <div class="placed-top-row">
         <span class="placed-label">
           ${activityTypeIconHtml(idea.activityType)}
@@ -1872,6 +2112,31 @@ function calendarPlacedCardHtml(idea, trip, span, showControls, isFirstSegment) 
         ${controls}
       </div>
       ${timeLabel ? `<div class="placed-time-row">${escapeHtml(formatTimeShort(timeLabel))}</div>` : ""}
+    </div>
+  `;
+}
+
+// A cross-day flight/transport's derived arrival echo (see
+// crossDayArrivalEchoes above) - deliberately its own, much simpler
+// render function rather than another branch of calendarPlacedCardHtml
+// above, since it shares almost nothing with a real placed card: no
+// scheduled.slot/span to read (it's not stored), no controls, no
+// drag. Still clickable to open the same idea's popover - the anchor
+// key is idea.id + "-echo" (see openCalendarPopoverAnchorKey above) so
+// positioning finds THIS element specifically, not the departure
+// card's, even though both share the same idea.id.
+function calendarArrivalEchoHtml(idea, trip) {
+  const anchorKey = `${idea.id}-echo`;
+  return `
+    <div class="cal-placed-card cal-arrival-echo" data-popover-anchor="${anchorKey}"
+         onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}', '${anchorKey}')">
+      <div class="placed-top-row">
+        <span class="placed-label">
+          ${activityTypeIconHtml(idea.activityType)}
+          <span class="placed-title">Arrives: ${escapeHtml(idea.title)}</span>
+        </span>
+      </div>
+      <div class="placed-time-row">${escapeHtml(formatTimeShort(idea.arrivalTime))}</div>
     </div>
   `;
 }
