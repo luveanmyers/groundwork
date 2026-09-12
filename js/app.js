@@ -49,6 +49,12 @@ let ideaFilters = defaultIdeaFilters();
 let expandedIdeaIds = new Set();
 let draggedIdeaId = null;
 
+// Which placed calendar card (if any) currently has its click-to-edit
+// popover open. Same in-memory, view-only treatment as expandedIdeaIds
+// above - it resets on trip switch and doesn't survive a reload, which
+// is fine since it's just "what's open right now," not saved data.
+let openCalendarPopoverIdeaId = null;
+
 // Whether the "Add an idea" form is currently open. Same reasoning as
 // above - the form used to always sit at the bottom of the page, which
 // felt heavy; now it's tucked behind a "+ Add idea" button and this
@@ -430,6 +436,14 @@ function renderTabContent(trip) {
   else if (currentTab === "packing") el.innerHTML = packingTabHtml(trip);
   else if (currentTab === "budget") el.innerHTML = budgetTabHtml(trip);
   else if (currentTab === "notes") el.innerHTML = notesTabHtml(trip);
+
+  // The calendar popover is a fixed-position element whose coordinates
+  // are computed in JS against its anchor card's real position - every
+  // full re-render recreates that anchor as a new DOM node, so this has
+  // to re-run every time, not just when the popover first opens. A
+  // no-op on every other tab / whenever nothing's open (see the early
+  // return in positionCalendarPopover()).
+  if (currentTab === "itinerary" && openCalendarPopoverIdeaId) positionCalendarPopover();
 }
 
 /* ------------------------------ Ideas tab ------------------------------- */
@@ -1469,6 +1483,16 @@ function itineraryTabHtml(trip) {
 
   const weeks = calendarWeeksForTrip(trip.startDate, trip.endDate);
 
+  // The click-to-edit popover is rendered as a sibling of the grid,
+  // not nested inside whichever cell its card sits in - a grid cell
+  // clips overflow, so a popover nested inside one would get cut off
+  // rather than floating freely. Its position on screen is computed
+  // separately, in JS, after this HTML lands in the DOM (see
+  // positionCalendarPopover(), called from renderTabContent()).
+  const openPopoverIdea = openCalendarPopoverIdeaId
+    ? itineraryIdeas.find((i) => i.id === openCalendarPopoverIdeaId)
+    : null;
+
   return `
     <div class="calendar-layout">
       <div class="calendar-sidebar"
@@ -1484,8 +1508,119 @@ function itineraryTabHtml(trip) {
       <div class="calendar-grid-wrap">
         ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas)).join("")}
       </div>
+      ${openPopoverIdea ? calendarEditPopoverHtml(trip, openPopoverIdea) : ""}
     </div>
   `;
+}
+
+// Fields shown: type-specific logistics (flight/transport/lodging,
+// reusing the exact same fields/labels as the kanban card's expanded
+// body via logisticsFieldsHtml()) plus confirmationInfo, which is the
+// one field that matches the actual on-trip use case (find booking
+// details fast). Deliberately does NOT include reservationNeeded/
+// reserved/urgent - those are ideation-stage decisions already made
+// by the time something's on the calendar, and editing them from a
+// second place risks them drifting from the kanban card's own state.
+//
+// Title is shown read-only (titles aren't editable after creation -
+// see product-decisions.md's "Idea cards - inline editing").
+//
+// Deliberately does NOT show an "auto-scheduled" badge/hint yet -
+// that only becomes true once Phase 4's auto-scheduling step ships;
+// every card on the calendar today got there by manual drag.
+function calendarEditPopoverHtml(trip, idea) {
+  const logisticsHtml = logisticsFieldsHtml(trip, idea);
+  return `
+    <div class="cal-edit-popover" id="cal-edit-popover">
+      <div class="cal-edit-popover-head">
+        <span class="cal-edit-popover-title">
+          ${activityTypeIconHtml(idea.activityType)}
+          ${escapeHtml(idea.title)}
+        </span>
+        <button type="button" class="cal-edit-popover-close" title="Close" onclick="handleCloseCalendarPopover()">&times;</button>
+      </div>
+      <div class="idea-edit-fields">
+        ${logisticsHtml}
+        <label class="confirmation-info-field">
+          <span>Confirmation details</span>
+          <textarea placeholder="Confirmation #, phone number, pickup instructions..." onchange="handleUpdateConfirmationInfo('${trip.id}', '${idea.id}', this.value)">${escapeHtml(idea.confirmationInfo)}</textarea>
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+function handleOpenCalendarPopover(event, tripId, ideaId) {
+  event.stopPropagation();
+  openCalendarPopoverIdeaId = ideaId;
+  renderTabContent(getActiveTrip());
+}
+
+function handleCloseCalendarPopover() {
+  openCalendarPopoverIdeaId = null;
+  renderTabContent(getActiveTrip());
+}
+
+// Positions the (already-rendered) popover relative to its anchor
+// card - always starts below the anchor, then clamps so it never
+// flows off the right edge or above the top of the viewport.
+//
+// Uses pure viewport-relative coordinates throughout, matching
+// .cal-edit-popover's `position: fixed` (fixed positions relative to
+// the viewport, not the document) - getBoundingClientRect() already
+// gives viewport-relative numbers that account for any scrolling
+// (including .screen's own internal overflow-y: auto scroll), so no
+// scrollX/scrollY offset gets added on top of that. The confirmed
+// calendar-mockup.html popover added window.scrollX/scrollY because
+// IT used position: absolute (document-relative) - copying that math
+// verbatim while using position: fixed here was a real bug (caught
+// 2026-09-12 during Step 1 testing): the two positioning models don't
+// mix, and the mismatch could push the popover off-screen depending
+// on scroll position. Called from renderTabContent().
+function positionCalendarPopover() {
+  const pop = document.getElementById("cal-edit-popover");
+  if (!pop) return;
+  const anchor = document.querySelector(`[data-idea-id="${openCalendarPopoverIdeaId}"]`);
+  if (!anchor) { openCalendarPopoverIdeaId = null; return; }
+
+  const r = anchor.getBoundingClientRect();
+  let top = r.bottom + 8;
+  let left = r.left;
+  pop.style.top = top + "px";
+  pop.style.left = left + "px";
+
+  requestAnimationFrame(() => {
+    const pr = pop.getBoundingClientRect();
+    if (pr.right > window.innerWidth - 12) {
+      left = window.innerWidth - pr.width - 12;
+    }
+    if (left < 12) left = 12;
+
+    const minTop = 8;
+    const fitsAbove = (r.top - pr.height - 8) >= 8;
+    if (pr.bottom > window.innerHeight - 12 && fitsAbove) {
+      top = r.top - pr.height - 8;
+    }
+    // Neither "stay below" nor "flip above" necessarily fits when the
+    // popover is tall (e.g. Lodging's 4 fields) and the anchor sits
+    // near the top of a short window - the check above only handles
+    // the flip-above case, so a too-tall popover with nowhere to flip
+    // to was previously left exactly where it started, running past
+    // the bottom of the viewport with no way to scroll it into view
+    // (position:fixed doesn't respond to page scroll). This clamps the
+    // bottom edge to stay on-screen as a second pass - down to minTop,
+    // at which point .cal-edit-popover's own max-height + overflow-y:
+    // auto (added earlier) takes over for anything still too tall to
+    // fully fit, so the rest becomes reachable by scrolling INSIDE the
+    // popover instead.
+    if (top + pr.height > window.innerHeight - 12) {
+      top = Math.max(minTop, window.innerHeight - 12 - pr.height);
+    }
+    if (top < minTop) top = minTop;
+
+    pop.style.top = top + "px";
+    pop.style.left = left + "px";
+  });
 }
 
 function calendarSidebarCardHtml(idea) {
@@ -1724,9 +1859,11 @@ function calendarPlacedCardHtml(idea, trip, span, showControls, isFirstSegment) 
 
   return `
     <div class="cal-placed-card${isAllDay ? " allday-bar" : ""}"
+         data-idea-id="${idea.id}"
          draggable="true"
          ondragstart="handleDragStart(event, '${idea.id}')"
-         ondragend="handleDragEnd(event)">
+         ondragend="handleDragEnd(event)"
+         onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}')">
       <div class="placed-top-row">
         <span class="placed-label">
           ${activityTypeIconHtml(idea.activityType)}
@@ -2195,6 +2332,17 @@ function escapeHtml(str) {
 }
 
 /* -------------------------------- Boot ----------------------------------- */
+
+// Clicking anywhere outside an open calendar popover closes it.
+// Clicks on the card that opened it already stopPropagation()'d
+// before this can fire. Clicks INSIDE the popover itself (typing into
+// a field, clicking a label) must NOT close it - only the explicit
+// close button, or a genuine click elsewhere, should.
+document.addEventListener("click", (event) => {
+  if (!openCalendarPopoverIdeaId) return;
+  if (event.target.closest("#cal-edit-popover")) return;
+  handleCloseCalendarPopover();
+});
 
 document.addEventListener("DOMContentLoaded", () => {
   render();

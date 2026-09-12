@@ -1487,6 +1487,13 @@ button.primary:active {
   flex: 1;
   min-width: 0;
   cursor: grab;
+  transition: filter 0.1s;
+}
+.cal-placed-card:hover {
+  filter: brightness(0.97); /* click-to-edit affordance, same idea as
+                                the confirmed mockup's hover treatment -
+                                darker rather than brighter since this
+                                palette is light, not dark */
 }
 .cal-placed-card[draggable="true"]:active {
   cursor: grabbing;
@@ -1561,4 +1568,76 @@ button.primary:active {
 .placed-controls .remove-btn {
   color: var(--danger);
   border-color: var(--danger);
+}
+
+/* Click-to-edit popover for a placed calendar card. Position (top/
+   left) is set inline via JS (positionCalendarPopover() in app.js) -
+   this block only owns appearance, sizing, and layout of what's
+   inside. Reuses .idea-edit-fields/.idea-edit-row/.idea-edit-field/
+   .confirmation-info-field for the fields themselves, same as the
+   kanban card's expanded body, so an input looks identical wherever
+   it's edited. */
+.cal-edit-popover {
+  position: fixed;
+  z-index: 40;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px); /* without this, a tall popover (e.g.
+     Lodging's 4 date/time fields) can render past the bottom of the
+     viewport with no way to see the rest - position:fixed doesn't
+     respond to page scroll the way position:absolute would. Capping
+     height and scrolling internally instead means the whole popover
+     is always reachable regardless of window size. */
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+}
+.cal-edit-popover-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cal-edit-popover-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.cal-edit-popover-title svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.cal-edit-popover-close {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.cal-edit-popover-close:hover {
+  color: var(--ink);
+}
+
+/* Native date/time inputs have a browser-enforced minimum content
+   width (for their day/month/year/AM-PM segments) that doesn't shrink
+   with flex the way a text input does. .idea-edit-row's side-by-side
+   layout works fine at the kanban card's width but overflows this
+   popover's narrower 280px - so within the popover specifically,
+   every row stacks to one field per line instead. Scoped to
+   .cal-edit-popover only; the kanban card's own inline-edit body is
+   untouched. */
+.cal-edit-popover .idea-edit-row {
+  flex-direction: column;
+  gap: 10px;
 }
