@@ -1666,3 +1666,20 @@ button.primary:active {
 .cal-placed-card.cal-arrival-echo .placed-title {
   font-style: italic;
 }
+
+/* Collision flag (LUV-7 Step 3) - ambient warning when two DIFFERENT
+   ideas share the exact same footprint (see the multi-item-stacking
+   decision - this is never blocked or evicted, just flagged in case
+   it's an accidental double-booking rather than intentional). Scoped
+   to regular slots only this pass - see product-decisions.md's
+   "Phase 4, Step 3" for why All Day/Lodging aren't included yet
+   (LUV-26). Reuses --danger, same token the reservation-cancellation
+   confirm and delete buttons use for "pay attention here." */
+.cal-placed-card.has-conflict {
+  border-color: var(--danger);
+}
+.conflict-badge {
+  color: var(--danger);
+  margin-left: 2px;
+  flex-shrink: 0;
+}

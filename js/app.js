@@ -1582,6 +1582,26 @@ function computeAutoSchedule(idea) {
 // computeAutoSchedule() only returns non-null for the three
 // auto-schedule types, so anything else is filtered out before this
 // function ever looks at it.
+//
+// Runs the same overlap-eviction check a manual drag/extend already
+// uses (fixed 2026-09-12, found during Step 3 testing): without this,
+// an auto-placed spanning bar (e.g. a same-day flight spanning
+// Midday+Afternoon) could genuinely, partially overlap a different
+// card without evicting OR grouping it - the multi-item-stacking/
+// collision-flag path above only fires on an EXACT footprint match,
+// and a partial overlap was silently falling through both mechanisms,
+// rendering as two overlapping boxes with no relationship to each
+// other. Lodging isn't included here - it has no eviction mechanism
+// at all yet (see LUV-26).
+//
+// Note on processing order: this loop can, in principle, evict a
+// LATER-processed item in the same pass before this loop reaches it,
+// in which case that item's cached `current` (read before the evict)
+// is briefly stale. Not specially handled - the very next render
+// (which the app's re-render-on-every-change architecture triggers
+// immediately after any interaction) re-runs this sync against fresh
+// data and self-corrects. A real inconsistency surviving more than one
+// render would be worth revisiting; a one-frame one isn't.
 function syncAutoScheduledIdeas(tripId, itineraryIdeas) {
   itineraryIdeas
     .filter((idea) => AUTO_SCHEDULE_TYPES.includes(idea.activityType))
@@ -1603,7 +1623,16 @@ function syncAutoScheduledIdeas(tripId, itineraryIdeas) {
         current.date !== target.date ||
         current.slot !== target.slot ||
         current.span !== target.span;
-      if (changed) scheduleIdea(tripId, idea.id, target);
+      if (!changed) return;
+
+      if (REGULAR_SLOT_KEYS.includes(target.slot)) {
+        const startRow = REGULAR_SLOT_KEYS.indexOf(target.slot);
+        const rows = [];
+        for (let i = 0; i < target.span; i++) rows.push(startRow + i);
+        evictOverlappingRegularSlotIdeas(tripId, idea.id, target.date, rows);
+      }
+
+      scheduleIdea(tripId, idea.id, target);
     });
 }
 
@@ -1951,6 +1980,14 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
     const col = 2 + weekDayKeys.indexOf(dayKey);
     const row = CALENDAR_SLOT_ROWS[slotKey];
     const items = bySlotFootprint[key];
+    // LUV-7 Step 3: two (or more) DIFFERENT ideas sharing the exact
+    // same footprint is the deliberate stacking case (never evicted -
+    // see the multi-item-stacking decision above), but it's still
+    // worth flagging visibly in case it's an accidental double-booking
+    // rather than an intentional pairing. Ambient warning, not a
+    // block - matches the confirmed collision-handling decision
+    // (product-decisions.md, 2026-09-07).
+    const hasConflict = items.length > 1;
     // This group sits on top of its backdrop .cal-cell (later in the
     // markup, same grid area), so it's what's actually under the
     // cursor once a cell holds anything - without its own drop
@@ -1963,7 +2000,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
            ondragover="handleCalendarDragOver(event)"
            ondragleave="handleCalendarDragLeave(event)"
            ondrop="handleCalendarDrop(event, '${trip.id}', '${dayKey}', '${slotKey}')">
-        ${items.map((idea) => calendarPlacedCardHtml(idea, trip, span)).join("")}
+        ${items.map((idea) => calendarPlacedCardHtml(idea, trip, span, undefined, undefined, undefined, hasConflict)).join("")}
       </div>
     `);
   });
@@ -2066,7 +2103,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
 // computed correctly for its OWN purpose (which segment shows
 // checkOutTime vs checkInTime, see placedCardTimeLabel below) even
 // though it never shows controls on any segment.
-function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment, interactive) {
+function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment, interactive, hasConflict) {
   const slotKey = idea.scheduled.slot;
   const isMultiDayBar = slotKey === "allday" || slotKey === "lodging";
   const lastSegment = isLastSegment === undefined ? true : isLastSegment;
@@ -2099,8 +2136,12 @@ function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment,
     ? `draggable="true" ondragstart="handleDragStart(event, '${idea.id}')" ondragend="handleDragEnd(event)"`
     : `draggable="false"`;
 
+  const conflictBadge = hasConflict
+    ? `<span class="conflict-badge" title="Another item is scheduled in this same slot">&#9888;</span>`
+    : "";
+
   return `
-    <div class="cal-placed-card${isMultiDayBar ? " allday-bar" : ""}${slotKey === "lodging" ? " lodging-bar" : ""}"
+    <div class="cal-placed-card${isMultiDayBar ? " allday-bar" : ""}${slotKey === "lodging" ? " lodging-bar" : ""}${hasConflict ? " has-conflict" : ""}"
          data-popover-anchor="${idea.id}"
          ${dragAttrs}
          onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}', '${idea.id}')">
@@ -2108,6 +2149,7 @@ function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment,
         <span class="placed-label">
           ${activityTypeIconHtml(idea.activityType)}
           <span class="placed-title">${escapeHtml(idea.title)}</span>
+          ${conflictBadge}
         </span>
         ${controls}
       </div>
