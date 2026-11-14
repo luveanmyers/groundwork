@@ -11,6 +11,15 @@ vanilla HTML/CSS/JS with no framework and no build step. The repo, folder, and
 `localStorage` key are still named `groundwork` on purpose (see Hard-to-Change
 entry 5). Hosted on GitHub Pages from `main`. The repo is public.
 
+It's built to be **used for real**: Luvean and Dave plan and travel with it,
+starting with Scotland (July 2027). Rank work by real planning and in-country
+value. A portfolio demo is a secondary benefit, not the driver.
+
+**Sync pivot (LUV-38, decided 2026-11-14):** trips are moving from
+per-browser `localStorage` to Firebase Firestore so Luvean and Dave can both
+edit, offline, on every device. Until that ships, data lives only in
+`localStorage`. The design is in the Linear doc "SetOut — Sync Design".
+
 ## Roles
 
 - **Luvean designs and does QA.** Luvean decides product direction, interaction
@@ -90,8 +99,9 @@ Luvean's go-ahead.
 
 ## Code conventions
 
-- **`js/storage.js` is the only file that touches `localStorage`.** Everything
-  else goes through its functions.
+- **`js/storage.js` is the only file that touches storage**: `localStorage`
+  today, and Firestore once sync lands. Everything else goes through its
+  functions.
 - **Schema changes need a migration.** Extend `migrateIdeasInState()` (numbered
   migrations) so saved data keeps working. First check whether anything
   actually reads the field (Hard-to-Change entry 7).
@@ -99,8 +109,10 @@ Luvean's go-ahead.
   Never mix auto-placed and explicitly placed children (Hard-to-Change entry 8).
 - **`scheduled.slot` strings are locked** (`morning`/`midday`/`afternoon`/
   `evening`/`allday`/`lodging`), and so are the constants keyed off them.
-- **Never put secrets in client code.** The repo is public and there is no
-  backend.
+- **Never put secrets in client code.** The repo is public. Firebase's web
+  config (apiKey, projectId and so on) is public by design and safe to commit.
+  The Firestore security rules are what protect the data, so every rules
+  change gets reviewed like code.
 - Code comments explain *why* for a reader who is learning. Keep that tone.
 
 ## Service worker (recurring gotcha)
