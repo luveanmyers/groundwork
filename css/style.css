@@ -587,6 +587,13 @@ button.primary:active {
   margin-top: 6px;
 }
 
+/* Hidden while the card is expanded, like the collapsed meta row above:
+   the expanded body has its own editable address field, so showing
+   both would repeat the address. */
+.kanban-card.is-expanded .kanban-card-exact-location {
+  display: none;
+}
+
 .kanban-card-desc {
   font-size: 0.88rem;
   line-height: 1.45;
@@ -659,7 +666,7 @@ button.primary:active {
 }
 
 /* Inline-editable fields for a card's core details (category, style,
-   region, exact location, description, link) - see kanbanCardHtml() /
+   region, address, description, link) - see kanbanCardHtml() /
    handleUpdateIdeaField() in app.js. Same label-above-control shape as
    .confirmation-info-field below, which was the original precedent
    for editing a card in place rather than through a separate form. */

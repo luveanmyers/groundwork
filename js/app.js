@@ -573,9 +573,9 @@ function ideaFormHtml(trip) {
         <label>Region
           <input name="region" type="text" placeholder="e.g. Cape Town" />
         </label>
-        <label>Exact location
-          <input name="location" type="text" placeholder="e.g. Table Mountain, Cape Town" />
-          <span class="muted small">For the map (once built). Not shown on the card until this idea is in The Plan or The Itinerary - Region is what shows on the board.</span>
+        <label>Address or meeting point
+          <input name="location" type="text" placeholder="e.g. ferry pier, hotel street address" />
+          <span class="muted small">Where you actually go. The map pins this spot. Shows on the card once it's in The Plan or The Itinerary.</span>
         </label>
       </div>
       <div class="row">
@@ -893,12 +893,17 @@ function kanbanCardHtml(trip, idea, columnKey) {
     : "";
 
   // Region is coarse and always visible - it's what orients you while
-  // browsing the board. Exact location is collected the whole time (the
-  // map needs it for every candidate) but only DISPLAYED once an idea
-  // has left The Ideas, when it becomes useful as reference info rather
-  // than clutter next to the near-identical Region line.
+  // browsing the board. The address (location.placeName) is collected
+  // the whole time (the map needs it for every candidate) but only
+  // DISPLAYED once an idea has left The Ideas, when it becomes useful
+  // as reference info rather than clutter next to the Region line.
+  //
+  // "Address or meeting point" means the place you physically go, not
+  // the attraction's name - the ferry pier rather than the island. The
+  // card title already says what it is. See LUV-36 in the Product
+  // Decisions Log for why this is one field rather than two.
   const exactLocationLine = columnKey !== "ideas" && idea.location.placeName
-    ? `<div class="kanban-card-exact-location">&#128204; Exact location: ${escapeHtml(idea.location.placeName)}</div>`
+    ? `<div class="kanban-card-exact-location">&#128204; Address: ${escapeHtml(idea.location.placeName)}</div>`
     : "";
 
   return `
@@ -925,6 +930,7 @@ function kanbanCardHtml(trip, idea, columnKey) {
         <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
         ${isReserved ? `<span class="badge-flag badge-reserved">&#10003; Reserved</span>` : ""}
       </div>
+      ${exactLocationLine}
 
       <div class="kanban-card-body">
         <div class="idea-edit-fields">
@@ -945,8 +951,8 @@ function kanbanCardHtml(trip, idea, columnKey) {
           </label>
           ${columnKey !== "ideas" ? `
             <label class="idea-edit-field">
-              <span>Exact location</span>
-              <input type="text" placeholder="e.g. Table Mountain, Cape Town" value="${escapeHtml(idea.location.placeName)}" onchange="handleUpdateIdeaLocation('${trip.id}', '${idea.id}', this.value.trim())" />
+              <span>Address or meeting point</span>
+              <input type="text" placeholder="e.g. ferry pier, hotel street address" value="${escapeHtml(idea.location.placeName)}" onchange="handleUpdateIdeaLocation('${trip.id}', '${idea.id}', this.value.trim())" />
             </label>
           ` : ""}
           <label class="idea-edit-field">
@@ -1018,7 +1024,7 @@ function handleUpdateIdeaField(tripId, ideaId, field, value) {
   renderTabContent(getActiveTrip());
 }
 
-// Exact location is nested under idea.location and, unlike the plain
+// The address (location.placeName) is nested under idea.location and, unlike the plain
 // fields above, has a real second concern: once real geocoding exists,
 // an edited place name invalidates whatever lat/lng was previously
 // looked up for the old text. Resetting geocodeStatus back to
@@ -1713,10 +1719,11 @@ function itineraryTabHtml(trip) {
   `;
 }
 
-// Fields shown: type-specific logistics (flight/transport/lodging,
+// Fields shown: the address / meeting point first (where to go is the
+// most-needed on-trip lookup - LUV-36, from the South Africa debrief),
+// then type-specific logistics (flight/transport/lodging,
 // reusing the exact same fields/labels as the kanban card's expanded
-// body via logisticsFieldsHtml()) plus confirmationInfo, which is the
-// one field that matches the actual on-trip use case (find booking
+// body via logisticsFieldsHtml()), then confirmationInfo (find booking
 // details fast). Deliberately does NOT include reservationNeeded/
 // reserved/urgent - those are ideation-stage decisions already made
 // by the time something's on the calendar, and editing them from a
@@ -1740,6 +1747,10 @@ function calendarEditPopoverHtml(trip, idea) {
         <button type="button" class="cal-edit-popover-close" title="Close" onclick="handleCloseCalendarPopover()">&times;</button>
       </div>
       <div class="idea-edit-fields">
+        <label class="idea-edit-field">
+          <span>Address or meeting point</span>
+          <input type="text" placeholder="e.g. ferry pier, hotel street address" value="${escapeHtml(idea.location.placeName)}" onchange="handleUpdateIdeaLocation('${trip.id}', '${idea.id}', this.value.trim())" />
+        </label>
         ${logisticsHtml}
         <label class="confirmation-info-field">
           <span>Confirmation details</span>

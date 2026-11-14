@@ -312,6 +312,10 @@ function addIdea(tripId, input) {
     // Itinerary is still a deliberate drag/click, same as selecting it
     // into The Plan at all.
     finalized: false,
+    // placeName is shown as "Address or meeting point": the place you
+    // physically go (the ferry pier, not the island), which is also what
+    // the map geocodes and pins. The key keeps its original name because
+    // renaming a saved field would need a migration (LUV-36).
     location: {
       placeName: rawLocation.placeName || "",
       lat: null,
