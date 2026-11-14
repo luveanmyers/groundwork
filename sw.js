@@ -12,7 +12,7 @@
   instead of a stale cached copy.
 */
 
-const CACHE_NAME = "setout-v1";
+const CACHE_NAME = "setout-v2";
 
 // The "app shell" - everything needed to run the app with no network at all.
 // Your actual trip DATA lives in localStorage (see storage.js), not here;
