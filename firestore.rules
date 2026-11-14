@@ -1,3 +1,5 @@
+rules_version = '2';
+
 // firestore.rules - who may read and write SetOut's shared trip data
 // --------------------------------------------------------------------
 // SetOut has no server of its own. The app talks straight to Firestore
@@ -19,8 +21,9 @@
 // it, only if you're signed in with a VERIFIED email that's on that
 // trip's memberEmails list. Emails are stored lowercase, so the check
 // lowercases the signed-in email too.
-
-rules_version = '2';
+//
+// (rules_version has to be the very first line of the file, before
+// any comment, or the console rejects it.)
 
 service cloud.firestore {
   match /databases/{database}/documents {
