@@ -6,6 +6,7 @@
 
     setout-dev  for local testing and branch previews
     setout      for the real app on GitHub Pages, holding real trips
+                (project ID setout-95ed9)
 
   Keeping them apart means a half-finished branch can never read, change
   or delete real trip data. The real site's address is the only thing
@@ -28,10 +29,17 @@ const FIREBASE_CONFIGS = {
     messagingSenderId: "477440016099",
     appId: "1:477440016099:web:9fc45fe7f56fcab7d6cfd6"
   },
-  // Filled in once the real "setout" project exists (LUV-39). Until then
-  // the real site has no project, so sync stays off there rather than
-  // quietly falling back to the dev project.
-  prod: null
+  // The real project. Its display name is "SetOut", but Firebase
+  // project IDs are global and "setout" was taken, so Firebase added a
+  // suffix: the ID is setout-95ed9.
+  prod: {
+    apiKey: "AIzaSyAr9aZ5EbQW8u6xEfQizOBX_k0vQschgsk",
+    authDomain: "setout-95ed9.firebaseapp.com",
+    projectId: "setout-95ed9",
+    storageBucket: "setout-95ed9.firebasestorage.app",
+    messagingSenderId: "505857475675",
+    appId: "1:505857475675:web:eb517fb03a54e9e5f8ab7e"
+  }
 };
 
 // The real site is the only place real data is allowed.
