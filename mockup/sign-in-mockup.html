@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - sign-in screen mockup (LUV-40)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* ---- Mockup scaffolding only (laying several phone frames side by side) ---- */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-frames { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 24px; }
+  .mockup-frame-wrap { width: 340px; max-width: 100%; }
+  .mockup-frame-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+  .mockup-phone { position: relative; height: 620px; background: var(--bg); border: 1px solid var(--border); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* ---- NEW, preview-only styles for the sign-in screen. These would move
+     into css/style.css once approved. Everything else on this page is the
+     real stylesheet. ---- */
+  .signin-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 28px; text-align: center; }
+  .signin-lockup { display: flex; align-items: center; font-size: 2.1rem; margin-bottom: 10px; }
+  .signin-lockup .word-set { font-family: var(--font-body); font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+  .signin-lockup .word-out { font-family: "Yeseva One", serif; color: var(--accent-vivid); }
+  .signin-lockup svg { margin: 0 5px; width: 82px; height: 32px; }
+  .signin-tagline { color: var(--ink-soft); font-size: 0.95rem; margin: 0 0 36px; }
+  /* White button with Google's "G", following Google's own sign-in
+     button guidance (light theme). */
+  .google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 280px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font: 600 1rem var(--font-body); cursor: pointer; box-shadow: var(--shadow-card); }
+  .google-btn:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+  .google-btn svg { width: 18px; height: 18px; flex: none; }
+  .signin-help { color: var(--ink-soft); font-size: 0.82rem; line-height: 1.5; margin-top: 18px; max-width: 280px; }
+  .signin-msg { font-size: 0.85rem; line-height: 1.5; margin-top: 16px; max-width: 280px; padding: 10px 12px; border-radius: 10px; background: var(--tint-soft); color: var(--ink); }
+  .menu-item .menu-account { display: flex; flex-direction: column; line-height: 1.3; }
+  .menu-item .menu-account small { color: var(--ink-soft); font-size: 0.78rem; }
+  .menu-divider { height: 1px; background: var(--surface-2); margin: 4px 6px; }
+</style>
+</head>
+<body>
+  <!-- Google "G" mark, reused by every frame -->
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="g-mark" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></symbol>
+    <symbol id="lockup-mark" viewBox="0 0 164 64"><rect x="2" y="38" width="20" height="20" rx="3" fill="var(--ink)"/><circle cx="40" cy="42" r="3.6" fill="var(--ink)"/><circle cx="60" cy="26" r="3" fill="var(--accent-vivid)"/><circle cx="78" cy="46" r="4.6" fill="var(--accent-vivid)"/><circle cx="102" cy="22" r="4" fill="var(--accent-vivid)"/><circle cx="126" cy="40" r="5.4" fill="var(--accent-vivid)"/><circle cx="152" cy="18" r="4.6" fill="var(--accent-vivid)"/></symbol>
+  </svg>
+
+  <div class="mockup-banner">MOCKUP - not the live app. Nothing here signs you in.</div>
+  <div class="mockup-note">
+    <b>LUV-40: the sign-in screen.</b> It shows only when nobody is signed in on this device, before anything else in the app.
+    After the first sign-in the app remembers you, opens straight to Home, and works offline. You don't see this screen again unless you sign out.
+    Frames 1-4 are the same screen in different situations. Frame 5 is where you sign out (the menu on any screen except Home).
+    <b>New styles</b> (the sign-in layout and the white Google button) are preview-only on this page. Everything else is the real stylesheet.
+  </div>
+
+  <div class="mockup-frames">
+
+    <!-- 1. Normal -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">1 · Signed out (normal)</div>
+      <div class="mockup-phone">
+        <div class="signin-screen">
+          <div class="signin-lockup"><span class="word-set">Set</span><svg viewBox="0 0 164 64"><use href="#lockup-mark"/></svg><span class="word-out">Out</span></div>
+          <p class="signin-tagline">Plan the trip together. Take it with you.</p>
+          <button class="google-btn" type="button"><svg><use href="#g-mark"/></svg>Sign in with Google</button>
+          <p class="signin-help">Use the Google account you'll plan with. Trips are shared with the people you invite.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Waiting for Google -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">2 · While Google's window is open</div>
+      <div class="mockup-phone">
+        <div class="signin-screen">
+          <div class="signin-lockup"><span class="word-set">Set</span><svg viewBox="0 0 164 64"><use href="#lockup-mark"/></svg><span class="word-out">Out</span></div>
+          <p class="signin-tagline">Plan the trip together. Take it with you.</p>
+          <button class="google-btn" type="button" disabled><svg><use href="#g-mark"/></svg>Signing in&hellip;</button>
+          <p class="signin-help">Finish signing in on Google's screen. Google always asks which account to use.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Offline -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">3 · No signal, never signed in here</div>
+      <div class="mockup-phone">
+        <div class="signin-screen">
+          <div class="signin-lockup"><span class="word-set">Set</span><svg viewBox="0 0 164 64"><use href="#lockup-mark"/></svg><span class="word-out">Out</span></div>
+          <p class="signin-tagline">Plan the trip together. Take it with you.</p>
+          <button class="google-btn" type="button" disabled><svg><use href="#g-mark"/></svg>Sign in with Google</button>
+          <div class="signin-msg">You're offline. The first sign-in on a device needs a connection. After that, SetOut works without one.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Didn't finish -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">4 · Sign-in didn't finish</div>
+      <div class="mockup-phone">
+        <div class="signin-screen">
+          <div class="signin-lockup"><span class="word-set">Set</span><svg viewBox="0 0 164 64"><use href="#lockup-mark"/></svg><span class="word-out">Out</span></div>
+          <p class="signin-tagline">Plan the trip together. Take it with you.</p>
+          <button class="google-btn" type="button"><svg><use href="#g-mark"/></svg>Sign in with Google</button>
+          <div class="signin-msg">Sign-in didn't finish, so nothing changed. Try again.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Menu with account + sign out -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">5 · Menu on any screen (except Home)</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup" role="button" tabindex="0"><span class="word-set">Set</span><svg width="51" height="20" viewBox="0 0 164 64"><use href="#lockup-mark"/></svg><span class="word-out">Out</span></div>
+            <h1 class="page-title">My Trips</h1>
+          </div>
+          <button class="icon-btn" aria-label="Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            <div class="menu-dropdown">
+              <div class="menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="7" y1="14" x2="12" y2="14"/></svg> My Trips</div>
+              <div class="menu-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a New Trip</div>
+              <div class="menu-item muted">Dashboard</div>
+              <div class="menu-item muted">Settings</div>
+              <div class="menu-divider"></div>
+              <div class="menu-item muted"><span class="menu-account">Signed in as<small>you@gmail.com</small></span></div>
+              <div class="menu-item">Sign out</div>
+            </div>
+          </button>
+        </header>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
