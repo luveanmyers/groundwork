@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - address / meeting point mockup (LUV-36)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* Mockup-only scaffolding. Everything inside the numbered sections
+     uses the real classes from css/style.css; the rules here only lay
+     the sections out on one page. */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-wrap { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; }
+  .mockup-section-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 28px 0 10px; }
+  .mockup-changed { outline: 2px dashed var(--accent-vivid); outline-offset: 3px; border-radius: 4px; }
+  .mockup-form-wrap { max-width: 640px; }
+
+  /* The real popover is position:fixed next to the clicked calendar
+     card. Here it sits in the page flow so it can be seen on its own. */
+  .cal-edit-popover.mockup-static { position: static; max-height: none; }
+</style>
+</head>
+<body>
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="i-land" viewBox="0 0 24 24"><path d="M3 17.6 8.5 8.3c.3-.5 1-.5 1.3 0l2.6 4.5 1.7-2.6c.3-.5 1-.5 1.3 0l5.1 7.4"/><circle cx="16.6" cy="6.4" r="1.5"/></symbol>
+    <symbol id="i-water" viewBox="0 0 24 24"><path d="M2.5 10.4c1.6-1.3 3.2-1.3 4.8 0s3.2 1.3 4.8 0 3.2-1.3 4.8 0 3.2 1.3 4.8 0"/><path d="M2.5 15.3c1.6-1.3 3.2-1.3 4.8 0s3.2 1.3 4.8 0 3.2-1.3 4.8 0 3.2 1.3 4.8 0"/></symbol>
+    <symbol id="i-culture" viewBox="0 0 24 24"><path d="M7.5 20V6.3H9.3V8H11.1V6.3H12.9V8H14.7V6.3H16.5V20"/><path d="M10.7 20v-2.7a1.3 1.3 0 0 1 2.6 0V20"/><path d="M12 6.3V3.9"/><path d="M12 3.9l2.3.9-2.3.9"/></symbol>
+    <symbol id="i-explore" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M15.3 8.5 13 13l-4.3 2.5L11 11z"/></symbol>
+  </svg>
+
+  <div class="mockup-banner">MOCKUP - not the live app. Sample Scotland data only, nothing here is saved.</div>
+  <div class="mockup-note">
+    <b>LUV-36, Option A:</b> no new field. The existing "Exact location" field becomes
+    <b>"Address or meeting point"</b>: the place you physically go, which is also what the map will pin.
+    The card's title already says <i>what</i> it is, so this field only has to say <i>where to go</i>.
+    Changed parts have a <b>dashed orange outline</b>. Everything else is exactly as it is today.<br>
+    <b>Kept as today, please confirm:</b> the address stays hidden on cards in The Ideas, so the board isn't
+    cluttered next to Region. It still gets filled in from the add form.
+  </div>
+
+  <div class="mockup-wrap">
+
+    <!-- 1. Add-idea form -->
+    <div class="mockup-section-title">1 · Ideas tab - Add an idea (top half; the rest is unchanged)</div>
+    <div class="mockup-form-wrap">
+      <form class="card form" onsubmit="event.preventDefault()">
+        <h2>Add an idea</h2>
+        <label>Title
+          <input name="title" type="text" maxlength="25" value="Staffa &amp; puffin boat" />
+        </label>
+        <label>Description
+          <textarea name="description" placeholder="Why it's interesting, where you saw it...">Puffins nest on Staffa Jun-Jul. Fingal's Cave landing.</textarea>
+        </label>
+        <label>Link
+          <input name="link" type="text" placeholder="e.g. airbnb.com/rooms/123 or https://..." />
+        </label>
+        <div class="row">
+          <label>Region
+            <input name="region" type="text" placeholder="e.g. Cape Town" value="Isle of Mull" />
+          </label>
+          <label class="mockup-changed">Address or meeting point
+            <input name="location" type="text" placeholder="e.g. ferry pier, hotel street address" value="Fionnphort ferry slipway, Isle of Mull" />
+            <span class="muted small">Where you actually go. The map pins this spot. Shows on the card once it's in The Plan or The Itinerary.</span>
+          </label>
+        </div>
+        <div class="row">
+          <label>Category
+            <select name="activityType">
+              <option>Land Activities</option><option selected>Water &amp; Diving</option><option>Historical &amp; Cultural</option><option>Food &amp; Wine</option><option>Exploring &amp; Sightseeing</option><option>Flight</option><option>Lodging</option><option>Transport (train, car, ferry, etc.)</option><option>Other</option>
+            </select>
+          </label>
+          <label>Style
+            <select name="style"><option>Guided</option><option>Self-guided</option></select>
+          </label>
+        </div>
+        <p class="muted small">&hellip; reservation checkboxes, confirmation details and the Add idea button follow, unchanged.</p>
+      </form>
+    </div>
+
+    <!-- 2. Kanban board -->
+    <div class="mockup-section-title">2 · Ideas tab - board (one card per column; the Itinerary card is expanded)</div>
+    <div class="kanban-board">
+
+      <div class="kanban-column">
+        <div class="kanban-column-header"><h2>The Ideas</h2><span class="kanban-column-count">1</span></div>
+        <div class="kanban-dropzone">
+          <div class="kanban-card" draggable="true">
+            <div class="kanban-card-header">
+              <div class="kanban-card-title-row">
+                <span class="kanban-chevron">&#9656;</span>
+                <span class="kanban-card-title">Fairy Pools walk</span>
+              </div>
+              <div class="kanban-card-actions">
+                <button class="kanban-move-btn" type="button" title="Move to The Plan">&rarr;</button>
+                <button class="icon-btn danger" type="button" aria-label="Delete idea">&times;</button>
+              </div>
+            </div>
+            <div class="kanban-card-collapsed-meta">
+              <span class="kanban-card-region">&#128205; Isle of Skye</span>
+              <span class="pill pill-activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-land"/></svg>Land Activities</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column">
+        <div class="kanban-column-header"><h2>The Plan</h2><span class="kanban-column-count">1</span></div>
+        <div class="kanban-dropzone">
+          <div class="kanban-card" draggable="true">
+            <div class="kanban-card-header">
+              <div class="kanban-card-title-row">
+                <span class="kanban-chevron">&#9656;</span>
+                <span class="kanban-card-title">Edinburgh Castle</span>
+              </div>
+              <div class="kanban-card-actions">
+                <span class="badge-flag badge-reservation-needed">Needs reservation</span>
+                <button class="kanban-move-btn" type="button" title="Move back to The Ideas">&larr;</button>
+                <button class="kanban-move-btn" type="button" title="Move to The Itinerary">&rarr;</button>
+                <button class="icon-btn danger" type="button" aria-label="Delete idea">&times;</button>
+              </div>
+            </div>
+            <div class="kanban-card-collapsed-meta">
+              <span class="kanban-card-region">&#128205; Edinburgh</span>
+              <span class="pill pill-activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-culture"/></svg>Historical &amp; Cultural</span>
+            </div>
+            <div class="kanban-card-exact-location mockup-changed">&#128204; Address: Castlehill, Edinburgh EH1 2NG</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kanban-column">
+        <div class="kanban-column-header"><h2>The Itinerary</h2><span class="kanban-column-count">1</span></div>
+        <div class="kanban-dropzone">
+          <div class="kanban-card is-expanded" draggable="false">
+            <div class="kanban-card-header">
+              <div class="kanban-card-title-row">
+                <span class="kanban-chevron is-expanded">&#9656;</span>
+                <span class="kanban-card-title">Staffa &amp; puffin boat</span>
+              </div>
+              <div class="kanban-card-actions">
+                <button class="kanban-move-btn" type="button" title="Move back to The Plan">&larr;</button>
+                <button class="icon-btn danger" type="button" aria-label="Delete idea">&times;</button>
+              </div>
+            </div>
+            <div class="kanban-card-collapsed-meta">
+              <span class="kanban-card-region">&#128205; Isle of Mull</span>
+              <span class="pill pill-activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-water"/></svg>Water &amp; Diving</span>
+              <span class="badge-flag badge-reserved">&#10003; Reserved</span>
+            </div>
+            <div class="kanban-card-body">
+              <div class="idea-edit-fields">
+                <div class="idea-edit-row">
+                  <label class="idea-edit-field"><span>Category</span>
+                    <select><option selected>Water &amp; Diving</option><option>Other</option></select>
+                  </label>
+                  <label class="idea-edit-field"><span>Style</span>
+                    <select><option selected>Guided</option><option>Self-guided</option></select>
+                  </label>
+                </div>
+                <label class="idea-edit-field"><span>Region</span>
+                  <input type="text" value="Isle of Mull" />
+                </label>
+                <label class="idea-edit-field mockup-changed"><span>Address or meeting point</span>
+                  <input type="text" placeholder="e.g. ferry pier, hotel street address" value="Fionnphort ferry slipway, Isle of Mull" />
+                </label>
+                <label class="idea-edit-field"><span>Description</span>
+                  <textarea>Puffins nest on Staffa Jun-Jul. Fingal's Cave landing.</textarea>
+                </label>
+                <label class="idea-edit-field"><span>Link</span>
+                  <div class="idea-edit-link-row"><input type="text" placeholder="e.g. airbnb.com/rooms/123 or https://..." /></div>
+                </label>
+              </div>
+              <div class="kanban-card-controls">
+                <button class="toggle-pill is-on" type="button">Reservation needed: Yes</button>
+                <button class="toggle-pill is-on" type="button">Reserved: Yes</button>
+                <button class="badge-urgent-toggle" type="button">Mark urgent</button>
+              </div>
+              <label class="confirmation-info-field"><span>Confirmation details</span>
+                <textarea>Booking #SM-4821. Check in 20 min before sailing.</textarea>
+              </label>
+              <label class="idea-edit-field"><span>Reservation time <span class="muted small">(optional - not every reservation has a fixed time)</span></span>
+                <input type="time" value="10:30" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Calendar popover -->
+    <div class="mockup-section-title">3 · Itinerary tab - calendar card popover (opens when you click a placed card)</div>
+    <div class="cal-edit-popover mockup-static">
+      <div class="cal-edit-popover-head">
+        <span class="cal-edit-popover-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-water"/></svg>
+          Staffa &amp; puffin boat
+        </span>
+        <button type="button" class="cal-edit-popover-close" title="Close">&times;</button>
+      </div>
+      <div class="idea-edit-fields">
+        <label class="idea-edit-field mockup-changed"><span>Address or meeting point</span>
+          <input type="text" placeholder="e.g. ferry pier, hotel street address" value="Fionnphort ferry slipway, Isle of Mull" />
+        </label>
+        <label class="confirmation-info-field"><span>Confirmation details</span>
+          <textarea placeholder="Confirmation #, phone number, pickup instructions...">Booking #SM-4821. Check in 20 min before sailing.</textarea>
+        </label>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top:8px;">New here: the address field sits at the top of the popover, above any flight, transport or lodging fields. Today the popover doesn't show the location at all.</p>
+
+  </div>
+</body>
+</html>
