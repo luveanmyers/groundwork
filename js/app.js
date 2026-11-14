@@ -100,6 +100,20 @@ let currentScreen = "home";
 // is currently open. In-memory only.
 let isMenuOpen = false;
 
+// ---- Sign-in state (LUV-40) ----
+// Who's signed in on this device, as reported by auth.js. In memory
+// only - Firebase itself remembers the sign-in between launches.
+//   "checking"  start-up, before Firebase has answered (a split second,
+//               even offline) - nothing is drawn yet, so the sign-in
+//               screen never flashes up for someone already signed in
+//   "signedOut" show the sign-in screen
+//   "signedIn"  show the app
+let authState = "checking";
+let signedInEmail = null;
+// What the sign-in screen is doing: "idle", "waiting" (Google's window
+// is open) or "failed" (it closed or errored before finishing).
+let signInStatus = "idle";
+
 // Grabs the single element we render everything into.
 function appRoot() {
   return document.getElementById("app");
@@ -110,6 +124,16 @@ function appRoot() {
 // exists - it's always reachable, and its hero banner is what shows/
 // hides depending on trip state (see renderHomeScreen below).
 function render() {
+  // Nothing in the app shows until someone is signed in on this device.
+  if (authState === "checking") {
+    appRoot().innerHTML = "";
+    return;
+  }
+  if (authState === "signedOut") {
+    renderSignInScreen();
+    return;
+  }
+
   if (currentScreen === "tripsList") {
     renderTripsListScreen();
   } else if (currentScreen === "newTrip") {
@@ -128,6 +152,100 @@ function render() {
     renderHomeScreen();
   }
 }
+
+/* ---------------------------- Sign-in (LUV-40) --------------------------- */
+// The sign-in screen and the handlers around it. auth.js does the
+// actual talking to Firebase; these only decide what to show. Reviewed
+// first as mockup/sign-in-mockup.html.
+
+// Called by auth.js at start-up and whenever someone signs in or out.
+function handleAuthChange(user) {
+  authState = user ? "signedIn" : "signedOut";
+  signedInEmail = user ? user.email : null;
+  signInStatus = "idle";
+  if (!user) {
+    // A fresh sign-in always starts from Home, not wherever the last
+    // person left off.
+    currentScreen = "home";
+    isMenuOpen = false;
+  }
+  render();
+}
+
+// If auth.js couldn't load at all (e.g. the very first launch with no
+// signal, before the service worker has a copy of Firebase), show the
+// sign-in screen rather than a blank page. It will say it's offline.
+function handleAuthLoadFailed() {
+  if (authState !== "checking") return;
+  authState = "signedOut";
+  render();
+}
+
+async function handleSignIn() {
+  if (!window.setoutAuth || !navigator.onLine) return;
+  signInStatus = "waiting";
+  render();
+  try {
+    // On success there's nothing to do here: auth.js reports the new
+    // user through handleAuthChange(), which draws the app.
+    await window.setoutAuth.signIn();
+  } catch (err) {
+    // Closed the window, pop-up blocked, network dropped... all mean the
+    // same thing to the person: nothing changed, try again.
+    console.warn("Sign-in didn't finish:", err.code || err);
+    signInStatus = "failed";
+    render();
+  }
+}
+
+// Signs out on THIS device only. Trips live in the account, so nothing
+// is lost - signing back in brings everything back.
+async function handleSignOut() {
+  isMenuOpen = false;
+  if (window.setoutAuth) await window.setoutAuth.signOut();
+}
+
+function renderSignInScreen() {
+  const offline = !navigator.onLine;
+  const waiting = signInStatus === "waiting";
+
+  let message = "";
+  if (offline) {
+    message = `<div class="signin-msg">You're offline. The first sign-in on a device needs a connection. After that, SetOut works without one.</div>`;
+  } else if (signInStatus === "failed") {
+    message = `<div class="signin-msg">Sign-in didn't finish, so nothing changed. Try again.</div>`;
+  }
+
+  const help = offline || signInStatus === "failed"
+    ? ""
+    : `<p class="signin-help">${waiting
+        ? "Finish signing in on Google's screen. Google always asks which account to use."
+        : "Use the Google account you'll plan with. Trips are shared with the people you invite."}</p>`;
+
+  appRoot().innerHTML = `
+    <main class="signin-screen">
+      <h1 class="signin-lockup" aria-label="SetOut">${brandLockupSvg()}</h1>
+      <p class="signin-tagline">Plan the trip together. Take it with you.</p>
+      <button class="google-btn" type="button" onclick="handleSignIn()" ${offline || waiting ? "disabled" : ""}>
+        ${googleMarkSvg()}${waiting ? "Signing in&hellip;" : "Sign in with Google"}
+      </button>
+      ${message}
+      ${help}
+    </main>
+  `;
+}
+
+// Google's "G" mark for the sign-in button, per Google's own sign-in
+// button guidance.
+function googleMarkSvg() {
+  return `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
+}
+
+// Going on/offline only changes what the sign-in screen says, so only
+// redraw while it's showing (redrawing the app itself could interrupt
+// someone typing).
+window.addEventListener("online", () => { if (authState === "signedOut") render(); });
+window.addEventListener("offline", () => { if (authState === "signedOut") render(); });
 
 /* ------------------------- Navigation helpers ------------------------- */
 // Every screen change goes through one of these three, so there's a
@@ -238,6 +356,11 @@ function menuButtonHtml() {
         <div class="menu-item" onclick="event.stopPropagation(); goToScreen('newTrip')">${plusIconSvg()} Start a New Trip</div>
         <div class="menu-item muted" title="Coming soon">${dashboardIconSvg()} Dashboard</div>
         <div class="menu-item muted" title="Coming soon">${settingsIconSvg()} Settings</div>
+        ${signedInEmail ? `
+          <div class="menu-divider"></div>
+          <div class="menu-item muted menu-account">Signed in as<small>${escapeHtml(signedInEmail)}</small></div>
+          <div class="menu-item" onclick="event.stopPropagation(); handleSignOut()">Sign out</div>
+        ` : ""}
       </div>`
     : "";
   return `

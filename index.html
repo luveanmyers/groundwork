@@ -43,5 +43,13 @@
        app.js calls, so it has to load first. -->
   <script src="js/storage.js"></script>
   <script src="js/app.js"></script>
+  <!-- Sign-in (LUV-40). firebase-config.js picks the Firebase project
+       (dev everywhere except the real site); auth.js is a module because
+       Firebase's SDK is. Both load after app.js, because auth.js calls
+       app.js's handleAuthChange(). If auth.js can't load at all (first
+       launch with no signal), handleAuthLoadFailed() shows the sign-in
+       screen's offline message instead of a blank page. -->
+  <script src="js/firebase-config.js"></script>
+  <script type="module" src="js/auth.js" onerror="handleAuthLoadFailed()"></script>
 </body>
 </html>
