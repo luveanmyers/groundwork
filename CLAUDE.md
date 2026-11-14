@@ -30,6 +30,21 @@ entry 5). Hosted on GitHub Pages from `main`. The repo is public.
    plus a log or diff check) before calling it done in Linear. A doc or ticket
    saying something shipped is not evidence that it did.
 
+## What Luvean reviews, by kind of change
+
+Start every review request with **"UI change: yes"** or **"UI change: no"**.
+
+- **UI change: yes** (anything Luvean would see or interact with: layout,
+  copy, styling, interactions, flows). Luvean validates the design *before*
+  production code: a real-CSS mockup in `mockup/`, plus the batched
+  interaction list below. Once it's built, Luvean reviews a preview before
+  "ship it".
+- **UI change: no** (caching, storage, migrations, logic, tooling, docs).
+  Luvean approves from a written summary: what changed, why, and how it was
+  tested. Name any structural part of the change before acting on it.
+  Point out any behavior change a user could notice, even without a visual
+  change (for example, the one-launch update lag in LUV-27).
+
 ## Reviewing interactions: one batched pass per screen
 
 When a screen is ready for review, give Luvean a **single numbered list of
