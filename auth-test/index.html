@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SetOut sign-in test</title>
+<!--
+  TEMPORARY TEST PAGE (LUV-40) - delete once the sign-in method is decided.
+
+  Question it answers: does "Sign in with Google" work when SetOut is
+  opened from an icon on the iPhone Home Screen? On iPhone, Google's
+  sign-in page can open outside the Home Screen app and fail to hand the
+  result back, so this has to be tried on a real phone, on the real web
+  address.
+
+  It ALWAYS uses the setout-dev Firebase project, even on the real site,
+  so it can never touch real trip data. It has its own manifest so that
+  "Add to Home Screen" opens this page, not the main app.
+
+  The second section also tests firestore.rules against setout-dev with
+  a real signed-in account: it creates one throwaway trip, checks what's
+  allowed and what's refused, then deletes it again.
+-->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="SetOut test" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  .test-wrap { max-width: 520px; margin: 0 auto; padding: 24px 16px 48px; }
+  .test-wrap h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  .test-wrap .card { margin-top: 16px; }
+  .test-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .test-row button { flex: 1 1 140px; }
+  .test-status { margin-top: 12px; font-weight: 700; }
+  .test-log { margin-top: 12px; font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .pass { color: #2f7d4f; }
+  .fail { color: var(--danger); }
+</style>
+</head>
+<body>
+  <div class="test-wrap">
+    <h1>SetOut sign-in test</h1>
+    <p class="muted small">Temporary page. Uses the test project only, so no real trip data is involved.</p>
+
+    <div class="card">
+      <p class="small"><b>Opened as:</b> <span id="mode"></span></p>
+      <div class="test-row">
+        <button class="primary" type="button" id="btn-popup">Sign in with Google</button>
+        <button type="button" id="btn-redirect">Try another way</button>
+      </div>
+      <div class="test-status" id="status">Checking&hellip;</div>
+      <div class="test-row">
+        <button type="button" id="btn-signout" hidden>Sign out</button>
+      </div>
+    </div>
+
+    <div class="card" id="rules-card" hidden>
+      <p class="small"><b>Security rules check.</b> Creates one throwaway test trip, checks what's allowed and refused, then deletes it.</p>
+      <div class="test-row">
+        <button class="primary" type="button" id="btn-rules">Run rules check</button>
+      </div>
+      <div class="test-log" id="rules-log"></div>
+    </div>
+
+    <div class="card">
+      <p class="small"><b>Log</b> (send a screenshot of this page if anything goes wrong)</p>
+      <div class="test-log" id="log"></div>
+    </div>
+  </div>
+
+  <!-- Defines FIREBASE_CONFIGS. This page ignores the dev/real switch and
+       always uses dev, on purpose. -->
+  <script src="../js/firebase-config.js"></script>
+  <script type="module">
+    // Firebase loads from Google's CDN at a pinned version (no build step).
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+      getRedirectResult, onAuthStateChanged, signOut, browserLocalPersistence, setPersistence
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, addDoc, getDoc, setDoc, updateDoc, deleteDoc
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const log = (msg) => { $("log").textContent += `${new Date().toLocaleTimeString()}  ${msg}\n`; };
+
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    $("mode").textContent = standalone
+      ? "Home Screen app (this is the case we need to test)"
+      : "Browser tab (fine for a first try, but the real test is from the Home Screen icon)";
+    log(`page loaded; standalone=${standalone}; host=${location.hostname}`);
+
+    const app = initializeApp(FIREBASE_CONFIGS.dev);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    await setPersistence(auth, browserLocalPersistence);
+    const provider = new GoogleAuthProvider();
+
+    // Shows a Firebase error code plainly - the code (e.g.
+    // auth/popup-blocked) is what tells us which way it failed.
+    const showError = (where, err) => {
+      $("status").innerHTML = `<span class="fail">Didn't work (${where}): ${err.code || err.message}</span>`;
+      log(`${where} error: ${err.code || ""} ${err.message}`);
+    };
+
+    // If we've just come back from the "other way" (a full-page
+    // redirect to Google), this is where its result arrives.
+    try {
+      const result = await getRedirectResult(auth);
+      if (result) log(`redirect result: signed in as ${result.user.email}`);
+      else log("no redirect result waiting");
+    } catch (err) { showError("redirect", err); }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        $("status").innerHTML = `<span class="pass">Signed in as ${user.email}</span>`;
+        log(`signed in: ${user.email}, emailVerified=${user.emailVerified}`);
+      } else {
+        $("status").textContent = "Not signed in";
+      }
+      $("btn-signout").hidden = !user;
+      $("rules-card").hidden = !user;
+    });
+
+    $("btn-popup").onclick = async () => {
+      log("trying Google sign-in (pop-up)");
+      try { await signInWithPopup(auth, provider); }
+      catch (err) { showError("pop-up", err); }
+    };
+    $("btn-redirect").onclick = async () => {
+      log("trying Google sign-in (full-page redirect)");
+      try { await signInWithRedirect(auth, provider); }
+      catch (err) { showError("redirect", err); }
+    };
+    $("btn-signout").onclick = async () => { await signOut(auth); log("signed out"); };
+
+    // ---- Security rules check -------------------------------------------
+    // Each step says what SHOULD happen. A step "passes" when the rules do
+    // exactly that - including refusing the things they're meant to refuse.
+    $("btn-rules").onclick = async () => {
+      const out = $("rules-log");
+      out.textContent = "";
+      const user = auth.currentUser;
+      const me = user.email.toLowerCase();
+      let passed = 0, total = 0;
+      const step = async (label, shouldWork, fn) => {
+        total++;
+        try {
+          await fn();
+          const ok = shouldWork;
+          if (ok) passed++;
+          out.innerHTML += `<div class="${ok ? "pass" : "fail"}">${ok ? "PASS" : "FAIL"} - ${label} (allowed)</div>`;
+        } catch (err) {
+          const ok = !shouldWork && err.code === "permission-denied";
+          if (ok) passed++;
+          out.innerHTML += `<div class="${ok ? "pass" : "fail"}">${ok ? "PASS" : "FAIL"} - ${label} (${err.code || err.message})</div>`;
+        }
+      };
+
+      let tripRef = null;
+      await step("Create a trip with me as a member", true, async () => {
+        tripRef = await addDoc(collection(db, "trips"), {
+          name: "Rules test (safe to delete)", memberEmails: [me], createdBy: user.uid, schemaVersion: 1
+        });
+      });
+      if (!tripRef) { out.innerHTML += "<div>Stopped: couldn't create the test trip.</div>"; return; }
+
+      await step("Read my trip back", true, () => getDoc(tripRef));
+      await step("Add an idea card to my trip", true, () => setDoc(doc(tripRef, "ideas", "test-idea"), { title: "Test idea" }));
+      await step("Write to an unknown list inside my trip (should be refused)", false, () => setDoc(doc(tripRef, "secrets", "x"), { a: 1 }));
+      await step("Create a trip that leaves me off the member list (should be refused)", false, () =>
+        addDoc(collection(db, "trips"), { name: "Not mine", memberEmails: ["someone@example.com"], createdBy: user.uid }));
+      await step("Empty my trip's member list (should be refused)", false, () => updateDoc(tripRef, { memberEmails: [] }));
+      await step("Change who created my trip (should be refused)", false, () => updateDoc(tripRef, { createdBy: "someone-else" }));
+      await step("Add another member to my trip (sharing)", true, () => updateDoc(tripRef, { memberEmails: [me, "test-share@example.com"] }));
+      await step("Delete the idea card", true, () => deleteDoc(doc(tripRef, "ideas", "test-idea")));
+      await step("Delete the test trip", true, () => deleteDoc(tripRef));
+
+      out.innerHTML += `<div style="margin-top:8px"><b>${passed} of ${total} checks passed.</b></div>`;
+      log(`rules check: ${passed}/${total} passed`);
+    };
+  </script>
+</body>
+</html>
