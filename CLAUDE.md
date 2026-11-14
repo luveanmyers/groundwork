@@ -90,11 +90,14 @@ Luvean's go-ahead.
 
 ## Service worker (recurring gotcha)
 
-`sw.js` is cache-first. Editing `app.js` or `style.css` does **not** bust the
-cache. Bump `CACHE_NAME` in `sw.js` in any change that touches files in
-`APP_SHELL`, or installed copies keep serving stale code. When asking Luvean to
-test, give the cache-bypass step up front: an Incognito window, or DevTools →
-Application → Service Workers → Unregister, then a hard reload.
+`sw.js` uses **stale-while-revalidate** (LUV-27). It answers from the cache
+right away and refreshes the copy in the background, so a deploy reaches
+installed copies **one launch late**: the next launch still shows the old
+version, and the one after that is current. Bump `CACHE_NAME` when the
+`APP_SHELL` list itself changes (a file added, removed or renamed) so the old
+cache gets cleaned up. When asking Luvean to test, explain the one-launch lag
+and give the bypass up front: an Incognito window, or DevTools → Application →
+Service Workers → Unregister, then a hard reload.
 
 ## Running locally
 
