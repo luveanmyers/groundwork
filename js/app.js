@@ -23,7 +23,11 @@
 
 // ---- View state (kept in memory only, never saved or synced) ----
 // Which bottom-nav tab is currently showing, while inside a trip.
-let currentTab = "itinerary";
+// A trip always opens on Ideas (LUV-47), whether it's new or reopened:
+// planning starts from ideas, and a new trip has no itinerary to show
+// yet. It deliberately doesn't remember the last tab you used.
+const TRIP_START_TAB = "ideas";
+let currentTab = TRIP_START_TAB;
 
 // Which Ideas-tab filters are currently applied. "all" means that filter
 // isn't narrowing anything. Kept in memory only (like currentTab) - a
@@ -721,14 +725,14 @@ function handleCreateTrip(event) {
     startDate: form.startDate.value,
     endDate: form.endDate.value
   });
-  currentTab = "itinerary";
+  currentTab = TRIP_START_TAB;
   currentScreen = "trip";
   render();
 }
 
 function openTrip(tripId) {
   setActiveTrip(tripId);
-  currentTab = "itinerary";
+  currentTab = TRIP_START_TAB;
   currentScreen = "trip";
   isShareOpen = false;
   ideaFilters = defaultIdeaFilters();
