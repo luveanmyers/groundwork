@@ -128,6 +128,33 @@ cache gets cleaned up. When asking Luvean to test, explain the one-launch lag
 and give the bypass up front: an Incognito window, or DevTools → Application →
 Service Workers → Unregister, then a hard reload.
 
+## Branch previews (LUV-28)
+
+Cloudflare Pages (project `setout-preview`) builds a preview of every pushed
+branch other than `main`. It hosts previews only: production stays on GitHub
+Pages from `main`, because the installed Home Screen app, its sign-in and its
+offline copy all belong to the `luveanmyers.github.io` address.
+
+- There's no build step: the build command is empty and the output folder is
+  the repo root. Automatic production deploys are off.
+- Previews use `setout-dev` automatically (`js/firebase-config.js` only picks
+  the real project on `luveanmyers.github.io`). Never add a preview host to
+  the real project.
+- Google sign-in works because `setout-preview.pages.dev` is in `setout-dev`'s
+  authorized domains, which covers every preview under it. Never add bare
+  `pages.dev`.
+- **Send the per-commit URL** (`<hash>.setout-preview.pages.dev`), not the
+  branch URL. Each per-commit URL is a new address, so it starts with no
+  service worker and always shows that commit's code. The branch URL stays the
+  same across pushes and has the one-launch lag. The cost is one Google
+  sign-in per review.
+- Find the per-commit URL in the commit's "Cloudflare Pages" check on GitHub
+  (public, no login needed:
+  `https://api.github.com/repos/luveanmyers/groundwork/commits/<sha>/check-runs`).
+  It appears about 30 seconds after the push.
+- Only pushes made after the project was connected get a preview. To preview
+  an older branch, push a new commit to it.
+
 ## Running locally
 
 ```bash
