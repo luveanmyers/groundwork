@@ -44,6 +44,11 @@ real one (`js/firebase-config.js`).
 ## What Luvean reviews, by kind of change
 
 Start every review request with **"UI change: yes"** or **"UI change: no"**.
+When there's a preview to check, also say where: **"Test on: computer"** by
+default, since that's easier for Luvean, or **"Test on: phone, because …"**
+only when the change depends on the phone (phone-width layout, touch, the
+installed Home Screen app, offline, or a bug only a real phone showed, like
+LUV-46).
 
 - **UI change: yes** (anything Luvean would see or interact with: layout,
   copy, styling, interactions, flows). Luvean validates the design *before*
