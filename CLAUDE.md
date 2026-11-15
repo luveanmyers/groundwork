@@ -148,6 +148,10 @@ offline copy all belong to the `luveanmyers.github.io` address.
   service worker and always shows that commit's code. The branch URL stays the
   same across pushes and has the one-launch lag. The cost is one Google
   sign-in per review.
+- Find the per-commit URL in the commit's "Cloudflare Pages" check on GitHub
+  (public, no login needed:
+  `https://api.github.com/repos/luveanmyers/groundwork/commits/<sha>/check-runs`).
+  It appears about 30 seconds after the push.
 - Only pushes made after the project was connected get a preview. To preview
   an older branch, push a new commit to it.
 
