@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - Home banner on a new device (LUV-45)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* Mockup scaffolding only. The Home screen itself is the real markup
+     and the real stylesheet, captured from the live app. */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-frames { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 24px; }
+  .mockup-frame-wrap { width: 380px; max-width: 100%; }
+  .mockup-frame-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+  .mockup-phone { min-height: 520px; background: var(--bg); border: 1px solid var(--border); border-radius: 28px; overflow: hidden; }
+  .mockup-changed { outline: 2px dashed var(--accent-vivid); outline-offset: 3px; }
+</style>
+</head>
+<body>
+  <div class="mockup-banner">MOCKUP - not the live app. Sample data only.</div>
+  <div class="mockup-note">
+    <b>LUV-45: Home on a device that has never opened a trip</b> (a new browser, a new phone, or Dave's phone once a trip is shared with him).
+    Today it says "No trip in progress" even though synced trips exist (frame 1). With this change it shows <b>Continue</b> for the trip
+    <b>coming up soonest</b> (frame 2, dashed outline). The banner itself is the existing "Continue" banner, and nothing about its look changes.<br>
+    <b>Which trip:</b> a trip happening now comes first, then the next upcoming one. If every trip has already ended, the one that ended most recently.
+    Trips with no dates come last. Once you open a trip on a device, the banner follows that choice, exactly as today.<br>
+    <b>Unchanged:</b> with no trips at all, the banner still says "No trip in progress" (frame 3).
+  </div>
+  <div class="mockup-frames">
+    
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">1 · Today: new device, 1 synced trip</div>
+      <div class="mockup-phone">
+        <header class="app-header"><h1 class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20" viewBox="0 0 164 64" fill="none" aria-hidden="true"><rect x="2" y="38" width="20" height="20" rx="3" fill="var(--ink)"></rect><circle cx="40" cy="42" r="3.6" fill="var(--ink)"></circle><circle cx="60" cy="26" r="3" fill="var(--accent-vivid)"></circle><circle cx="78" cy="46" r="4.6" fill="var(--accent-vivid)"></circle><circle cx="102" cy="22" r="4" fill="var(--accent-vivid)"></circle><circle cx="126" cy="40" r="5.4" fill="var(--accent-vivid)"></circle><circle cx="152" cy="18" r="4.6" fill="var(--accent-vivid)"></circle></svg><span class="word-out">Out</span></h1></header>
+        <main class="screen"><div class="hero-banner empty"><div class="eyebrow">No trip in progress</div><div class="trip-name">Ready to plan your next one?</div></div><div class="bento-grid">
+        <div class="tile tile-trips"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="7" y1="14" x2="12" y2="14"></line></svg><div><div class="tile-label">My Trips</div><div class="tile-sub">1 trip saved</div></div></div>
+        <div class="tile tile-new"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><div class="tile-label">Start a New Trip</div></div>
+        <div class="tile tile-dash disabled"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="19" x2="4" y2="10"></line><line x1="12" y1="19" x2="12" y2="4"></line><line x1="20" y1="19" x2="20" y2="14"></line></svg><div><div class="tile-label">Dashboard</div><div class="coming-soon-badge">Coming soon</div></div></div>
+        <div class="tile tile-settings disabled"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle></svg><div><div class="tile-label">Settings</div><div class="coming-soon-badge">Coming soon</div></div></div>
+      </div></main>
+      </div>
+    </div>
+    
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">2 · After: same device</div>
+      <div class="mockup-phone">
+        <header class="app-header"><h1 class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20" viewBox="0 0 164 64" fill="none" aria-hidden="true"><rect x="2" y="38" width="20" height="20" rx="3" fill="var(--ink)"></rect><circle cx="40" cy="42" r="3.6" fill="var(--ink)"></circle><circle cx="60" cy="26" r="3" fill="var(--accent-vivid)"></circle><circle cx="78" cy="46" r="4.6" fill="var(--accent-vivid)"></circle><circle cx="102" cy="22" r="4" fill="var(--accent-vivid)"></circle><circle cx="126" cy="40" r="5.4" fill="var(--accent-vivid)"></circle><circle cx="152" cy="18" r="4.6" fill="var(--accent-vivid)"></circle></svg><span class="word-out">Out</span></h1></header>
+        <main class="screen"><div class="hero-banner mockup-changed"><div class="eyebrow">Continue</div><div class="trip-name">Scotland 2027</div><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div></div><div class="bento-grid">
+        <div class="tile tile-trips"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="7" y1="14" x2="12" y2="14"></line></svg><div><div class="tile-label">My Trips</div><div class="tile-sub">1 trip saved</div></div></div>
+        <div class="tile tile-new"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><div class="tile-label">Start a New Trip</div></div>
+        <div class="tile tile-dash disabled"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="19" x2="4" y2="10"></line><line x1="12" y1="19" x2="12" y2="4"></line><line x1="20" y1="19" x2="20" y2="14"></line></svg><div><div class="tile-label">Dashboard</div><div class="coming-soon-badge">Coming soon</div></div></div>
+        <div class="tile tile-settings disabled"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle></svg><div><div class="tile-label">Settings</div><div class="coming-soon-badge">Coming soon</div></div></div>
+      </div></main>
+      </div>
+    </div>
+    
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">3 · No trips at all (unchanged)</div>
+      <div class="mockup-phone">
+        <header class="app-header"><h1 class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20" viewBox="0 0 164 64" fill="none" aria-hidden="true"><rect x="2" y="38" width="20" height="20" rx="3" fill="var(--ink)"></rect><circle cx="40" cy="42" r="3.6" fill="var(--ink)"></circle><circle cx="60" cy="26" r="3" fill="var(--accent-vivid)"></circle><circle cx="78" cy="46" r="4.6" fill="var(--accent-vivid)"></circle><circle cx="102" cy="22" r="4" fill="var(--accent-vivid)"></circle><circle cx="126" cy="40" r="5.4" fill="var(--accent-vivid)"></circle><circle cx="152" cy="18" r="4.6" fill="var(--accent-vivid)"></circle></svg><span class="word-out">Out</span></h1></header>
+        <main class="screen"><div class="hero-banner empty"><div class="eyebrow">No trip in progress</div><div class="trip-name">Ready to plan your next one?</div></div><div class="bento-grid">
+        <div class="tile tile-trips"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="7" y1="14" x2="12" y2="14"></line></svg><div><div class="tile-label">My Trips</div><div class="tile-sub">0 trips saved</div></div></div>
+        <div class="tile tile-new"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><div class="tile-label">Start a New Trip</div></div>
+        <div class="tile tile-dash disabled"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="19" x2="4" y2="10"></line><line x1="12" y1="19" x2="12" y2="4"></line><line x1="20" y1="19" x2="20" y2="14"></line></svg><div><div class="tile-label">Dashboard</div><div class="coming-soon-badge">Coming soon</div></div></div>
+        <div class="tile tile-settings disabled"><svg class="tile-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle></svg><div><div class="tile-label">Settings</div><div class="coming-soon-badge">Coming soon</div></div></div>
+      </div></main>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
