@@ -678,7 +678,7 @@ function renderTripsListScreen() {
       ${subpageHeaderHtml('<h1 class="page-title">My Trips</h1>')}
     </header>
     <main class="screen">
-      ${trips.length ? tripRows : `<p class="muted empty-state">No trips yet. <a href="#" onclick="event.preventDefault(); goToScreen('newTrip')">Start your first one</a> - everything you enter is stored only on this phone.</p>`}
+      ${trips.length ? tripRows : `<p class="muted empty-state">No trips on this account yet. <a href="#" onclick="event.preventDefault(); goToScreen('newTrip')">Start your first one</a>.</p>`}
     </main>
   `;
 }
