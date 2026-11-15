@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SetOut - Lodging/transport gap flag (LUV-29)</title>
+<title>SetOut - Lodging/transport gap flag (LUV-29) v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
@@ -16,16 +16,17 @@
   .mockup-note ul { margin: 4px 0 0; padding-left: 18px; }
   .mockup-wrap { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; }
   .mockup-switch { max-width: 1300px; margin: 14px auto 0; padding: 0 16px; display: flex; gap: 8px; align-items: center; font-size: 0.82rem; color: var(--ink-soft); }
-  .mockup-switch button { font: inherit; font-weight: 700; padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; }
-  .mockup-switch button.on { background: var(--accent-vivid); border-color: var(--accent-vivid); color: #fff; }
+  .mockup-switch select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); }
+  .mockup-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 0.82rem; padding: 10px 16px; border-radius: var(--radius-pill); display: none; z-index: 60; }
 
-  /* ---- PREVIEW-ONLY: the new gap flag. Not in css/style.css yet. ---- */
-  /* Same --danger token the collision flag (has-conflict) already uses
-     for "pay attention here", dashed so it reads as "something missing"
-     rather than "something placed". */
+  /* ---- PREVIEW-ONLY: new styles, not in css/style.css yet ---- */
+
+  /* "No lodging" flag: fills the empty overnight cell for a night with
+     no Lodging card. Same --danger token the double-booking flag uses,
+     dashed so it reads as "something missing", not "something placed". */
   .cal-gap-flag {
     border: 1px dashed var(--danger);
-    background: #FBEDEA; /* a pale --danger tint */
+    background: #FBEDEA; /* pale --danger tint */
     color: var(--danger);
     border-radius: 6px;
     padding: 4px 6px;
@@ -35,40 +36,81 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 2px;
     min-width: 0;
-    cursor: default; /* not clickable: purely ambient */
+    min-height: 40px;
+    cursor: default; /* not clickable */
   }
-  .cal-gap-flag .gap-line { overflow: hidden; text-overflow: ellipsis; }
-  .cal-row-label.gap-label { color: var(--danger); }
 
-  /* Option B: the flag lives inside the Lodging bar's checkout segment. */
-  .cal-placed-card.lodging-bar.has-gap { border-color: var(--danger); border-style: dashed; }
-  .placed-gap-row { font-size: 0.7rem; font-weight: 600; color: var(--danger); padding-left: 18px; line-height: 1.3; }
+  /* Transport flag: a small chip at the start of the stay you're
+     travelling TO. Clickable (opens the transport popover). */
+  .transport-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    margin-left: 18px;
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: 1px dashed var(--danger);
+    background: #FBEDEA;
+    color: var(--danger);
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 18px);
+    align-self: flex-start;
+  }
+  .transport-chip span { overflow: hidden; text-overflow: ellipsis; }
+  .transport-chip:hover { filter: brightness(0.96); }
+  /* After "Mark as sorted": calm grey, keeps the note visible. */
+  .transport-chip.sorted {
+    border-style: solid;
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
 
-  body.variant-a .only-b { display: none; }
-  body.variant-b .only-a { display: none; }
+  .transport-popover .popover-hint { font-size: 0.78rem; color: var(--ink-soft); margin: 0 0 10px; line-height: 1.45; }
+  .transport-popover textarea { width: 100%; min-height: 56px; font: inherit; font-size: 0.82rem; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; }
+  .transport-popover .popover-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .transport-popover .popover-actions button { font: inherit; font-size: 0.82rem; font-weight: 700; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+  .transport-popover .btn-primary { background: var(--accent-vivid); color: #fff; border: 1px solid var(--accent-vivid); }
+  .transport-popover .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
 </style>
 </head>
-<body class="variant-a">
+<body>
 
-<div class="mockup-banner">MOCKUP - review only (LUV-29). Nothing here saves. Uses the real css/style.css.</div>
+<div class="mockup-banner">MOCKUP v2 - review only (LUV-29). Nothing here saves. Uses the real css/style.css.</div>
 
 <div class="mockup-note">
-  <b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Fri Jul 16, 2027. Three Lodging cards: Edinburgh flat (Jul 6&ndash;9), Loch Ness B&amp;B in the Highlands (Jul 10&ndash;13), Portree cottage on Skye (Jul 14&ndash;16).
+  <b>What changed from v1</b>
   <ul>
-    <li><b>Night of Jul 9:</b> nothing booked between Edinburgh and Loch Ness &rarr; <b>No lodging</b> flag. The region changes too, but a dated Transport card (Train to Inverness, Jul 10) covers it, so no transport flag.</li>
-    <li><b>Night of Jul 13:</b> nothing booked &rarr; <b>No lodging</b>. Highlands &rarr; Skye with no dated Flight or Transport card in between &rarr; <b>Transport needed</b> too. The two-day Highland tour above it doesn't count as lodging (decided 2026-09-06).</li>
-    <li>The undated "Hire car to Skye" card in the sidebar does <b>not</b> clear the transport flag (open question 3 below).</li>
-    <li>Jul 16 is the last day, so it has no night to flag.</li>
+    <li>The bottom row now shows <b>where you sleep each night</b>. A stay's bar ends on its last night, not on check-out day. So "Edinburgh flat, check in Jul 6, check out Jul 9" covers Jul 6, 7 and 8. The bar shows "In" time on its first night and "Out" time on its last.</li>
+    <li>A night with nothing booked gets a red <b>No lodging</b> flag <b>in that same row</b>. The separate "Gaps" row is gone.</li>
+    <li><b>Transport needed</b> is a small red chip at the start of the stay you're travelling to. Click it to add a note, mark it sorted, or add a Transport card.</li>
+    <li>Try the row name below. "Overnight" is the starting suggestion.</li>
   </ul>
-  Compare the two placements with the switch below. Hover a flag to see its tooltip.
+  <b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027.
+  <ul>
+    <li><b>Night of Jul 9:</b> nothing booked &rarr; No lodging. Edinburgh &rarr; Highlands is covered by the dated "Train to Inverness" card, so no transport chip.</li>
+    <li><b>Night of Jul 13:</b> nothing booked &rarr; No lodging. Highlands &rarr; Skye has no dated Flight or Transport card, so the Portree bar gets a red <b>Transport</b> chip. The two-day Highland tour above doesn't count as lodging.</li>
+    <li><b>Skye &rarr; Glasgow (Jul 16):</b> already marked sorted with a note, so its chip is grey.</li>
+    <li>Jul 17 is the last day: no night, so no flag.</li>
+  </ul>
 </div>
 
 <div class="mockup-switch">
-  Where the flag sits:
-  <button type="button" id="btn-a" class="on" onclick="setVariant('a')">A: own row under Lodging (recommended)</button>
-  <button type="button" id="btn-b" onclick="setVariant('b')">B: inside the Lodging bar</button>
+  Row name:
+  <select onchange="document.querySelectorAll('.night-row-label').forEach(function (el) { el.textContent = this.value; }, this)">
+    <option>Overnight</option>
+    <option>Sleeping in</option>
+    <option>Staying at</option>
+    <option>Night</option>
+    <option>Bed</option>
+  </select>
 </div>
 
 <div class="mockup-wrap">
@@ -76,10 +118,6 @@
     <div class="calendar-sidebar">
       <h2>Itinerary Building Blocks</h2>
       <div class="muted small">Cards in The Itinerary column without a day yet. Drag one onto the calendar, or drag a placed card back here to unschedule it.</div>
-      <div class="calendar-sidebar-card" draggable="true">
-        <span class="pill pill-activity">Transport</span>
-        <div class="row-title">Hire car to Skye</div>
-      </div>
       <div class="calendar-sidebar-card" draggable="true">
         <span class="pill pill-activity">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-food"/></svg>Food &amp; Drink</span>
@@ -101,15 +139,15 @@
           <div class="cal-day-header" style="grid-row:1; grid-column:7;">Jul 9<span class="dow">Fri</span></div>
           <div class="cal-day-header" style="grid-row:1; grid-column:8;">Jul 10<span class="dow">Sat</span></div>
 
-          <!-- backdrop rows 2-7, every cell explicitly placed -->
           <div class="cal-row-label" style="grid-row:2; grid-column:1;">All day</div>
           <div class="cal-row-label" style="grid-row:3; grid-column:1;">Morning</div>
           <div class="cal-row-label" style="grid-row:4; grid-column:1;">Midday</div>
           <div class="cal-row-label" style="grid-row:5; grid-column:1;">Afternoon</div>
           <div class="cal-row-label" style="grid-row:6; grid-column:1;">Evening</div>
-          <div class="cal-row-label" style="grid-row:7; grid-column:1;">Lodging</div>
+          <div class="cal-row-label night-row-label" style="grid-row:7; grid-column:1;">Overnight</div>
           <script>
-            // Mockup shortcut: writes the 6x7 backdrop cells for this week.
+            // Mockup shortcut: writes this week's 6x7 backdrop cells,
+            // each explicitly placed, same as the real calendar.
             (function () {
               const outside = [2, 3];
               let html = "";
@@ -119,7 +157,6 @@
             })();
           </script>
 
-          <!-- placed items -->
           <div class="cal-placed-group" style="grid-column:5; grid-row:3;">
             <div class="cal-placed-card" draggable="true">
               <div class="placed-top-row"><span class="placed-label">
@@ -134,34 +171,21 @@
             </div>
           </div>
 
-          <div class="cal-placed-group lodging-group only-a" style="grid-column:4 / span 4; grid-row:7;">
+          <!-- Overnight row: nights only -->
+          <div class="cal-placed-group lodging-group" style="grid-column:4 / span 3; grid-row:7;">
             <div class="cal-placed-card allday-bar lodging-bar">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Edinburgh flat</span></span></div>
-              <div class="placed-time-row">10:00am</div>
+              <div class="placed-time-row">In 3:00pm &middot; Out 10:00am</div>
             </div>
+          </div>
+          <div class="cal-gap-flag" style="grid-row:7; grid-column:7;" title="No Lodging card covers the night of Jul 9.">
+            <span>&#9888; No lodging</span>
           </div>
           <div class="cal-placed-group lodging-group" style="grid-column:8 / span 1; grid-row:7;">
             <div class="cal-placed-card allday-bar lodging-bar">
-              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span><span class="allday-continues">&rarr;</span></span></div>
-              <div class="placed-time-row">4:00pm</div>
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span><span class="allday-continues">&rarr;</span></div>
+              <div class="placed-time-row">In 4:00pm</div>
             </div>
-          </div>
-
-          <!-- Option B: the Edinburgh bar's checkout segment carries the flag.
-               (Replaces the plain bar above when B is selected.) -->
-          <div class="cal-placed-group lodging-group only-b" style="grid-column:4 / span 4; grid-row:7;">
-            <div class="cal-placed-card allday-bar lodging-bar has-gap" title="No Lodging card covers the night of Jul 9.">
-              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Edinburgh flat</span></span></div>
-              <div class="placed-time-row">10:00am</div>
-              <div class="placed-gap-row">&#9888; No lodging tonight (Jul 9)</div>
-            </div>
-          </div>
-
-          <!-- Option A: new row 8, explicitly placed -->
-          <div class="cal-row-label gap-label only-a" style="grid-row:8; grid-column:1;">Gaps</div>
-          <div class="cal-gap-flag only-a" style="grid-row:8; grid-column:7;" title="No Lodging card covers the night of Jul 9.">
-            <span class="gap-line">&#9888; No lodging</span>
-            <span class="gap-line">Night of Jul 9</span>
           </div>
         </div>
       </div>
@@ -176,20 +200,19 @@
           <div class="cal-day-header" style="grid-row:1; grid-column:5;">Jul 14<span class="dow">Wed</span></div>
           <div class="cal-day-header" style="grid-row:1; grid-column:6;">Jul 15<span class="dow">Thu</span></div>
           <div class="cal-day-header" style="grid-row:1; grid-column:7;">Jul 16<span class="dow">Fri</span></div>
-          <div class="cal-day-header outside-trip" style="grid-row:1; grid-column:8;">Jul 17<span class="dow">Sat</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:8;">Jul 17<span class="dow">Sat</span></div>
 
           <div class="cal-row-label" style="grid-row:2; grid-column:1;">All day</div>
           <div class="cal-row-label" style="grid-row:3; grid-column:1;">Morning</div>
           <div class="cal-row-label" style="grid-row:4; grid-column:1;">Midday</div>
           <div class="cal-row-label" style="grid-row:5; grid-column:1;">Afternoon</div>
           <div class="cal-row-label" style="grid-row:6; grid-column:1;">Evening</div>
-          <div class="cal-row-label" style="grid-row:7; grid-column:1;">Lodging</div>
+          <div class="cal-row-label night-row-label" style="grid-row:7; grid-column:1;">Overnight</div>
           <script>
             (function () {
-              const outside = [8];
               let html = "";
               for (let row = 2; row <= 7; row++) for (let col = 2; col <= 8; col++)
-                html += `<div class="cal-cell${outside.includes(col) ? " outside-trip" : ""}" style="grid-row:${row}; grid-column:${col};"></div>`;
+                html += `<div class="cal-cell" style="grid-row:${row}; grid-column:${col};"></div>`;
               document.currentScript.insertAdjacentHTML("beforebegin", html);
             })();
           </script>
@@ -216,39 +239,56 @@
             </div>
           </div>
 
-          <div class="cal-placed-group lodging-group only-a" style="grid-column:2 / span 3; grid-row:7;">
+          <!-- Overnight row -->
+          <div class="cal-placed-group lodging-group" style="grid-column:2 / span 2; grid-row:7;">
             <div class="cal-placed-card allday-bar lodging-bar">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
-              <div class="placed-time-row">11:00am</div>
+              <div class="placed-time-row">Out 11:00am</div>
             </div>
           </div>
-          <div class="cal-placed-group lodging-group only-b" style="grid-column:2 / span 3; grid-row:7;">
-            <div class="cal-placed-card allday-bar lodging-bar has-gap" title="No Lodging card covers the night of Jul 13. The region changes from Highlands to Skye with no dated Flight or Transport card in between.">
-              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
-              <div class="placed-time-row">11:00am</div>
-              <div class="placed-gap-row">&#9888; No lodging tonight (Jul 13)</div>
-              <div class="placed-gap-row">&#9888; Transport: Highlands &rarr; Skye</div>
-            </div>
+          <div class="cal-gap-flag" style="grid-row:7; grid-column:4;" title="No Lodging card covers the night of Jul 13.">
+            <span>&#9888; No lodging</span>
           </div>
-          <div class="cal-placed-group lodging-group" style="grid-column:5 / span 3; grid-row:7;">
+          <div class="cal-placed-group lodging-group" style="grid-column:5 / span 2; grid-row:7;">
             <div class="cal-placed-card allday-bar lodging-bar">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Portree cottage</span></span></div>
-              <div class="placed-time-row">10:00am</div>
+              <div class="placed-time-row">In 4:00pm &middot; Out 10:00am</div>
+              <div class="transport-chip" id="chip-skye" data-from="Highlands" data-to="Skye" onclick="openTransport(event, this)" title="Highlands to Skye: no dated Flight or Transport card yet.">&#9888; <span>Transport: Highlands &rarr; Skye</span></div>
             </div>
           </div>
-
-          <div class="cal-row-label gap-label only-a" style="grid-row:8; grid-column:1;">Gaps</div>
-          <div class="cal-gap-flag only-a" style="grid-row:8; grid-column:4;" title="No Lodging card covers the night of Jul 13. The region changes from Highlands to Skye with no dated Flight or Transport card in between.">
-            <span class="gap-line">&#9888; No lodging</span>
-            <span class="gap-line">Night of Jul 13</span>
-            <span class="gap-line">&#9888; Transport needed: Highlands &rarr; Skye</span>
+          <div class="cal-placed-group lodging-group" style="grid-column:7 / span 1; grid-row:7;">
+            <div class="cal-placed-card allday-bar lodging-bar">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Glasgow hotel</span></span></div>
+              <div class="placed-time-row">In 3:00pm &middot; Out 11:00am</div>
+              <div class="transport-chip sorted" id="chip-glasgow" data-from="Skye" data-to="Glasgow" data-note="Rental car, drop off in Glasgow" onclick="openTransport(event, this)" title="Skye to Glasgow: sorted. Rental car, drop off in Glasgow">&#10003; <span>Rental car, drop off in Glasgow</span></div>
+            </div>
           </div>
         </div>
       </div>
 
     </div>
+
+    <!-- Transport popover: same .cal-edit-popover shell as the card popover. -->
+    <div class="cal-edit-popover transport-popover" id="transport-popover" style="display:none;">
+      <div class="cal-edit-popover-head">
+        <span class="cal-edit-popover-title" id="tp-title">Highlands &rarr; Skye</span>
+        <button type="button" class="cal-edit-popover-close" title="Close" onclick="closeTransport()">&times;</button>
+      </div>
+      <p class="popover-hint" id="tp-hint"></p>
+      <label class="confirmation-info-field">
+        <span>How are you getting there?</span>
+        <textarea id="tp-note" placeholder="e.g. rental car, train (no booking needed)"></textarea>
+      </label>
+      <div class="popover-actions">
+        <button type="button" class="btn-primary" id="tp-sorted" onclick="markSorted()">Mark as sorted</button>
+        <button type="button" class="btn-secondary" id="tp-unsort" onclick="unmarkSorted()">Flag it again</button>
+        <button type="button" class="btn-secondary" onclick="addTransportCard()">+ Add a Transport card</button>
+      </div>
+    </div>
   </div>
 </div>
+
+<div class="mockup-toast" id="toast"></div>
 
 <!-- Icon sprite, copied from index.html (only the icons used above). -->
 <svg style="display:none" aria-hidden="true">
@@ -258,11 +298,73 @@
 </svg>
 
 <script>
-  function setVariant(v) {
-    document.body.className = "variant-" + v;
-    document.getElementById("btn-a").classList.toggle("on", v === "a");
-    document.getElementById("btn-b").classList.toggle("on", v === "b");
+  // Mockup-only behavior for the transport chip + popover. Nothing saves.
+  let openChip = null;
+
+  function openTransport(event, chip) {
+    event.stopPropagation(); // the chip sits inside a clickable Lodging bar
+    openChip = chip;
+    const from = chip.dataset.from, to = chip.dataset.to;
+    const sorted = chip.classList.contains("sorted");
+    document.getElementById("tp-title").innerHTML = `${from} &rarr; ${to}`;
+    document.getElementById("tp-hint").textContent = sorted
+      ? "Marked as sorted. Both of you see this note."
+      : `No dated Flight or Transport card between ${from} and ${to}. If it doesn't need booking (rental car, local train), mark it sorted. If it does, add a Transport card so the booking has somewhere to live.`;
+    document.getElementById("tp-note").value = chip.dataset.note || "";
+    document.getElementById("tp-sorted").textContent = sorted ? "Save note" : "Mark as sorted";
+    document.getElementById("tp-unsort").style.display = sorted ? "" : "none";
+    const pop = document.getElementById("transport-popover");
+    pop.style.display = "";
+    const r = chip.getBoundingClientRect();
+    pop.style.top = (r.bottom + 8) + "px";
+    pop.style.left = Math.min(r.left, window.innerWidth - 292) + "px";
+    requestAnimationFrame(() => {
+      const pr = pop.getBoundingClientRect();
+      if (pr.bottom > window.innerHeight - 12) pop.style.top = Math.max(8, r.top - pr.height - 8) + "px";
+    });
   }
+
+  function closeTransport() {
+    document.getElementById("transport-popover").style.display = "none";
+    openChip = null;
+  }
+
+  function renderChip(chip) {
+    const sorted = chip.classList.contains("sorted");
+    const label = sorted
+      ? (chip.dataset.note || "Transport sorted")
+      : `Transport: ${chip.dataset.from} → ${chip.dataset.to}`;
+    chip.innerHTML = `${sorted ? "&#10003;" : "&#9888;"} <span></span>`;
+    chip.querySelector("span").textContent = label;
+  }
+
+  function markSorted() {
+    openChip.dataset.note = document.getElementById("tp-note").value.trim();
+    openChip.classList.add("sorted");
+    renderChip(openChip);
+    closeTransport();
+  }
+
+  function unmarkSorted() {
+    openChip.classList.remove("sorted");
+    delete openChip.dataset.note;
+    renderChip(openChip);
+    closeTransport();
+  }
+
+  function addTransportCard() {
+    const from = openChip.dataset.from, to = openChip.dataset.to;
+    closeTransport();
+    const t = document.getElementById("toast");
+    t.textContent = `Added "${from} → ${to}" to The Plan. The flag clears once it's in The Itinerary with a date.`;
+    t.style.display = "block";
+    setTimeout(() => { t.style.display = "none"; }, 3500);
+  }
+
+  document.addEventListener("click", (e) => {
+    const pop = document.getElementById("transport-popover");
+    if (openChip && !pop.contains(e.target)) closeTransport();
+  });
 </script>
 </body>
 </html>
