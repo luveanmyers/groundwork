@@ -432,9 +432,37 @@ function menuButtonHtml() {
 // mockup/home-mockup.html (retired once this was reviewed) for what
 // was confirmed before this got built.
 
+// Which trip Home's banner offers to continue on a device that hasn't
+// opened one yet (LUV-45). Which trip is open is saved per device, so
+// since sync a brand new device - or Dave's phone - can have trips
+// without an open one. Rather than say "No trip in progress", offer the
+// trip coming up soonest: one happening now, then the next upcoming one;
+// if every trip has ended, the one that ended most recently; trips with
+// no dates last. Only DISPLAYS the choice - tapping the banner is what
+// opens it and makes it this device's open trip.
+// (Dates are "YYYY-MM-DD" strings, which sort correctly as plain text.)
+function soonestTrip(trips) {
+  const today = isoDateKey(new Date());
+  const startOf = (t) => t.startDate || t.endDate;
+  const endOf = (t) => t.endDate || t.startDate;
+  const dated = trips.filter((t) => startOf(t));
+
+  // A trip in progress has the earliest start of all trips that haven't
+  // ended yet, so sorting those by start date puts it first.
+  const notEnded = dated
+    .filter((t) => endOf(t) >= today)
+    .sort((a, b) => startOf(a).localeCompare(startOf(b)));
+  if (notEnded.length) return notEnded[0];
+
+  const ended = dated.slice().sort((a, b) => endOf(b).localeCompare(endOf(a)));
+  if (ended.length) return ended[0];
+
+  return trips[0] || null;
+}
+
 function renderHomeScreen() {
-  const trip = getActiveTrip();
   const trips = getTrips();
+  const trip = getActiveTrip() || soonestTrip(trips);
 
   const banner = trip
     ? `
