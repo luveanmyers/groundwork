@@ -305,12 +305,14 @@ window.addEventListener("offline", () => { if (authState === "signedOut") render
 function goHome() {
   currentScreen = "home";
   isMenuOpen = false;
+  isShareOpen = false;
   render();
 }
 
 function goToScreen(screen) {
   currentScreen = screen;
   isMenuOpen = false;
+  isShareOpen = false;
   render();
 }
 
@@ -596,6 +598,7 @@ function openTrip(tripId) {
   setActiveTrip(tripId);
   currentTab = "itinerary";
   currentScreen = "trip";
+  isShareOpen = false;
   ideaFilters = defaultIdeaFilters();
   expandedIdeaIds = new Set();
   draggedIdeaId = null;
@@ -618,7 +621,7 @@ function confirmDeleteTrip(tripId) {
 function renderTripScreen(trip) {
   appRoot().innerHTML = `
     <header class="app-header">
-      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>`)}
+      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>${shareChipHtml(trip)}`)}
     </header>
     <main class="screen" id="tab-content"></main>
     <nav class="tab-bar">
@@ -628,8 +631,104 @@ function renderTripScreen(trip) {
       <button class="tab-btn ${currentTab === "budget" ? "active" : ""}" onclick="showTab('budget')">Budget</button>
       <button class="tab-btn ${currentTab === "notes" ? "active" : ""}" onclick="showTab('notes')">Notes</button>
     </nav>
+    ${isShareOpen ? sharePanelHtml(trip) : ""}
   `;
   renderTabContent(trip);
+}
+
+/* ------------------------- Sharing a trip (LUV-42) ------------------------ */
+// The Share button under a trip's name, and the panel it opens: who's on
+// the trip, and a box to add someone by email. Anyone added can see and
+// edit the whole trip once they sign in with Google using that email.
+// Reviewed first as mockup/share-trip-mockup.html.
+
+// Panel state, in memory only. shareDraft keeps a half-typed email if
+// the screen redraws (say, an edit arrives from Dave) while it's open.
+let isShareOpen = false;
+let shareDraft = "";
+let shareMessage = "";
+
+function shareChipHtml(trip) {
+  const others = (trip.memberEmails || []).length - 1;
+  return `
+    <button class="share-chip" type="button" onclick="openSharePanel()">
+      ${peopleIconSvg()}${others > 0 ? `Shared with ${others}` : "Share"}
+    </button>`;
+}
+
+function peopleIconSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 13.6c2.6.3 4.5 2.3 4.5 5"/></svg>`;
+}
+
+function sharePanelHtml(trip) {
+  const me = getCurrentUserEmail();
+  const rows = getTripMembers(trip.id).map((email) => `
+    <div class="member-row">
+      <span class="member-email">${escapeHtml(email)}${email === me ? ` <span class="member-you">(you)</span>` : ""}</span>
+      ${email === me ? "" : `<button class="member-remove" type="button" data-email="${escapeHtml(email)}" onclick="handleRemoveMember('${trip.id}', this.dataset.email)">Remove</button>`}
+    </div>`).join("");
+
+  // Clicking the shaded area (but not the panel itself) closes it.
+  return `
+    <div class="share-overlay" onclick="if (event.target === this) closeSharePanel()">
+      <div class="share-panel" role="dialog" aria-label="Share ${escapeHtml(trip.name)}">
+        <div class="share-panel-head">
+          <h2>Share ${escapeHtml(trip.name)}</h2>
+          <button class="share-close" type="button" aria-label="Close" onclick="closeSharePanel()">&times;</button>
+        </div>
+        <p class="share-intro">People on this trip can see and edit all of it: ideas, itinerary, packing, budget and notes.</p>
+        <div class="member-list">${rows}</div>
+        <!-- novalidate: the browser's own "please enter an email" bubble
+             would replace the app's message below. type="email" stays,
+             for the email keyboard on phones. -->
+        <form class="share-add-row" novalidate onsubmit="handleAddMember(event, '${trip.id}')">
+          <input name="email" type="email" placeholder="Their Google email" autocomplete="off" value="${escapeHtml(shareDraft)}" oninput="shareDraft = this.value" />
+          <button class="primary" type="submit">Add</button>
+        </form>
+        ${shareMessage ? `<p class="share-msg">${escapeHtml(shareMessage)}</p>` : ""}
+        <p class="share-hint">They'll see it the next time they open SetOut, signed in with Google using this email.</p>
+      </div>
+    </div>`;
+}
+
+function openSharePanel() {
+  isShareOpen = true;
+  shareDraft = "";
+  shareMessage = "";
+  render();
+}
+
+function closeSharePanel() {
+  isShareOpen = false;
+  shareMessage = "";
+  render();
+}
+
+// Deliberately loose: something@something.something. Google decides
+// what's a real account; this only catches obvious typos.
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function handleAddMember(event, tripId) {
+  event.preventDefault();
+  const email = event.target.email.value.trim().toLowerCase();
+  if (!LOOKS_LIKE_EMAIL.test(email)) {
+    shareMessage = "That doesn't look like an email address.";
+  } else if (getTripMembers(tripId).includes(email)) {
+    shareMessage = `${email} is already on this trip.`;
+  } else {
+    addTripMember(tripId, email);
+    shareDraft = "";
+    shareMessage = "";
+  }
+  render();
+}
+
+function handleRemoveMember(tripId, email) {
+  const trip = getTrips().find((t) => t.id === tripId);
+  const ok = confirm(`Remove ${email} from ${trip ? trip.name : "this trip"}? They'll lose access to the whole trip on all their devices. You can add them back any time.`);
+  if (!ok) return;
+  removeTripMember(tripId, email);
+  render();
 }
 
 function showTab(tab) {

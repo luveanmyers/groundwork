@@ -195,6 +195,36 @@ function deleteTrip(tripId) {
   remote("deleteTrip", tripId, children);
 }
 
+/* ---------------------------- Sharing (LUV-42) ------------------------- */
+// A trip's members are the emails in its memberEmails list. Anyone on
+// the list can see and edit the whole trip once they sign in with Google
+// using that email (firestore.rules enforces this). Emails are stored
+// lowercase so "Dave@Gmail.com" and "dave@gmail.com" are one person.
+
+function getTripMembers(tripId) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  return trip ? (trip.memberEmails || []) : [];
+}
+
+function getCurrentUserEmail() {
+  return syncUser ? syncUser.email : null;
+}
+
+function addTripMember(tripId, email) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip) return;
+  const clean = email.trim().toLowerCase();
+  trip.memberEmails = [...(trip.memberEmails || []), clean];
+  remote("addMember", tripId, clean);
+}
+
+function removeTripMember(tripId, email) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip) return;
+  trip.memberEmails = (trip.memberEmails || []).filter((e) => e !== email);
+  remote("removeMember", tripId, email);
+}
+
 /* --------------------------- Packing ----------------------------- */
 
 function getPackingItems(tripId) {

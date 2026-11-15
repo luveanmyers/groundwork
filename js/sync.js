@@ -31,7 +31,7 @@
 
 import {
   collection, doc, query, where, onSnapshot,
-  setDoc, updateDoc, deleteDoc, writeBatch
+  setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 
@@ -173,6 +173,15 @@ window.setoutSync = {
   },
   updateTrip(tripId, fields) {
     report(updateDoc(doc(db, "trips", tripId), fields), "the trip");
+  },
+  // Sharing (LUV-42). arrayUnion / arrayRemove add or remove one email
+  // without rewriting the whole list, so if two people change the
+  // member list at the same moment, neither change is lost.
+  addMember(tripId, email) {
+    report(updateDoc(doc(db, "trips", tripId), { memberEmails: arrayUnion(email) }), "the new trip member");
+  },
+  removeMember(tripId, email) {
+    report(updateDoc(doc(db, "trips", tripId), { memberEmails: arrayRemove(email) }), "the member removal");
   },
   setItem(tripId, list, data) {
     report(setDoc(doc(db, "trips", tripId, list, data.id), withoutId(data)), `a ${list} entry`);
