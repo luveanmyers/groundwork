@@ -447,13 +447,18 @@ button.primary:active {
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--ink);
+  /* Up to two lines, then "..." (LUV-46). One line cut most titles
+     short in a phone-width column. line-clamp needs this -webkit-box
+     display; every current browser supports it. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .kanban-card.is-expanded .kanban-card-title {
-  white-space: normal;
+  -webkit-line-clamp: unset;
 }
 
 .kanban-card-actions {
@@ -541,8 +546,8 @@ button.primary:active {
   border: 1px solid rgba(68, 89, 171, 0.3);
 }
 
-/* Small read-only status badges shown in the card header/collapsed
-   view - urgent, needs-reservation, and reserved. Display only; the
+/* Small read-only status badges shown on the card's second line
+   (moved off the title row in LUV-46) - urgent, needs-reservation, and reserved. Display only; the
    actual controls that CHANGE these values are the .toggle-pill /
    .badge-urgent-toggle buttons in the expanded card body below. */
 .badge-flag {

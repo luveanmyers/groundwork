@@ -1348,9 +1348,9 @@ function kanbanCardHtml(trip, idea, columnKey) {
           <span class="kanban-chevron ${isExpanded ? "is-expanded" : ""}">&#9656;</span>
           <span class="kanban-card-title">${escapeHtml(idea.title)}</span>
         </div>
+        <!-- Only buttons up here. Badges live on the line below (LUV-46):
+             on a phone, a badge in this row squeezed the title to nothing. -->
         <div class="kanban-card-actions">
-          ${idea.urgent ? `<span class="badge-flag badge-urgent">Urgent</span>` : ""}
-          ${needsReservationFlag ? `<span class="badge-flag badge-reservation-needed">Needs reservation</span>` : ""}
           ${backBtn}
           ${forwardBtn}
           <button class="icon-btn danger" type="button" onclick="handleDeleteIdea('${trip.id}', '${idea.id}')" aria-label="Delete idea">&times;</button>
@@ -1358,8 +1358,10 @@ function kanbanCardHtml(trip, idea, columnKey) {
       </div>
 
       <div class="kanban-card-collapsed-meta">
+        ${idea.urgent ? `<span class="badge-flag badge-urgent">Urgent</span>` : ""}
         ${idea.region ? `<span class="kanban-card-region">&#128205; ${escapeHtml(idea.region)}</span>` : ""}
         <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+        ${needsReservationFlag ? `<span class="badge-flag badge-reservation-needed">Needs reservation</span>` : ""}
         ${isReserved ? `<span class="badge-flag badge-reserved">&#10003; Reserved</span>` : ""}
       </div>
       ${exactLocationLine}
