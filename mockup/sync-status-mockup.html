@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - Sync status and signed-in account (LUV-43)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* ---- Mockup scaffolding only (phone frames side by side) ---- */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-note ul { margin: 4px 0 0; padding-left: 18px; }
+  .mockup-frames { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 24px; }
+  .mockup-frame-wrap { width: 360px; max-width: 100%; }
+  .mockup-frame-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+  .mockup-phone { position: relative; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; }
+  /* The real tab bar is fixed to the bottom of the window; inside a frame it sits at the frame's bottom instead. */
+  .mockup-phone .tab-bar { position: absolute; }
+  .mockup-changed { outline: 2px dashed var(--accent-vivid); outline-offset: 3px; border-radius: 6px; }
+  .mockup-confirm { margin: 18px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-card); font-size: 0.9rem; line-height: 1.5; }
+  .mockup-confirm .mockup-confirm-btns { display: flex; justify-content: flex-end; gap: 16px; margin-top: 14px; font-weight: 700; color: var(--accent-vivid); }
+  .mockup-legend { width: 100%; max-width: 760px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; }
+  .mockup-legend table { width: 100%; border-collapse: collapse; }
+  .mockup-legend td { padding: 8px 6px; vertical-align: top; border-top: 1px solid var(--surface-2); }
+  .mockup-legend tr:first-child td { border-top: none; }
+  .mockup-legend td:first-child { white-space: nowrap; }
+  .mockup-sample { padding: 8px 14px 0; font-size: 0.85rem; }
+
+  /* ---- NEW, preview-only styles for LUV-43. These move into
+     css/style.css once approved; everything else is the real stylesheet. ---- */
+
+  /* NEW COLOR (needs your call): an amber for "your changes haven't
+     reached the server yet". Not alarming like --danger, but distinct
+     from the soft grey of the calm states. 4.9:1 contrast on --bg. */
+  :root { --sync-waiting: #9A6314; }
+
+  /* The status itself: an icon and a few words. Calm states are soft
+     grey; only "Waiting to sync" takes the amber. */
+  .sync-status { display: inline-flex; align-items: center; gap: 5px; font: 600 0.74rem var(--font-body); color: var(--ink-soft); white-space: nowrap; }
+  .sync-status svg { width: 13px; height: 13px; flex: none; }
+  .sync-status.waiting { color: var(--sync-waiting); }
+
+  /* Home: who's signed in, plus the status, top right. One button. */
+  .account-btn { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; background: none; border: none; padding: 4px 0 0; cursor: pointer; min-width: 0; max-width: 62%; text-align: right; }
+  .account-email { font: 600 0.78rem var(--font-body); color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Sub-pages: the status is a small button under the title. On the
+     trip screen it sits on the same row as the Share button. */
+  .header-meta-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .header-meta-row .share-chip { margin-top: 0; }
+  .sync-btn { background: none; border: none; padding: 4px 0; cursor: pointer; }
+
+  /* Home, when this account has no trips: say which account, so a
+     wrong-account sign-in is obvious. */
+  .banner-account { margin: 10px 0 0; font-size: 0.82rem; line-height: 1.5; color: var(--ink-soft); }
+  .banner-account b { color: var(--ink); font-weight: 700; word-break: break-all; }
+  .banner-link { display: inline-block; margin-top: 6px; background: none; border: none; padding: 0; font: 700 0.84rem var(--font-body); color: var(--accent-vivid); cursor: pointer; }
+
+  /* The account panel (same bottom-sheet pattern as Share). */
+  .share-overlay { position: absolute; }
+  .share-panel { max-height: 88%; }
+  .account-status-card { display: flex; gap: 10px; background: var(--surface); border-radius: var(--radius); padding: 12px 14px; margin: 12px 0; }
+  .account-status-card svg { width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--ink-soft); }
+  .account-status-card.waiting svg { color: var(--sync-waiting); }
+  .account-status-card .status-title { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+  .account-status-card.waiting .status-title { color: var(--sync-waiting); }
+  .account-status-card p { margin: 3px 0 0; font-size: 0.82rem; line-height: 1.5; color: var(--ink-soft); }
+  .account-label { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-top: 4px; }
+  .account-panel-email { font-size: 0.95rem; font-weight: 600; color: var(--ink); margin: 3px 0 4px; word-break: break-all; }
+  .account-signout { margin-top: 14px; background: none; border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; font: 700 0.88rem var(--font-body); color: var(--danger); cursor: pointer; }
+</style>
+</head>
+<body>
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.5 13.6c2.6.3 4.5 2.3 4.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="burger" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/></symbol>
+    <!-- Status icons -->
+    <symbol id="s-synced" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="s-syncing" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M18.5 2.5v3.7h-3.7M5.5 21.5v-3.7h3.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="s-waiting" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="s-offline" viewBox="0 0 24 24"><path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 7.2 8.6 4.7 4.7 0 0 0 7 18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="lockup" viewBox="0 0 164 64"><rect x="2" y="38" width="20" height="20" rx="3" fill="var(--ink)"/><circle cx="40" cy="42" r="3.6" fill="var(--ink)"/><circle cx="60" cy="26" r="3" fill="var(--accent-vivid)"/><circle cx="78" cy="46" r="4.6" fill="var(--accent-vivid)"/><circle cx="102" cy="22" r="4" fill="var(--accent-vivid)"/><circle cx="126" cy="40" r="5.4" fill="var(--accent-vivid)"/><circle cx="152" cy="18" r="4.6" fill="var(--accent-vivid)"/></symbol>
+    <symbol id="i-trips" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="2"/><line x1="7" y1="14" x2="12" y2="14" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-dash" viewBox="0 0 24 24"><line x1="4" y1="19" x2="4" y2="10" stroke="currentColor" stroke-width="2"/><line x1="12" y1="19" x2="12" y2="4" stroke="currentColor" stroke-width="2"/><line x1="20" y1="19" x2="20" y2="14" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  </svg>
+
+  <div class="mockup-banner">MOCKUP - not the live app. Sample data only. Nothing here syncs or signs out.</div>
+  <div class="mockup-note">
+    <b>LUV-43: a sync status you can glance at, and the signed-in account where you'll notice it.</b> Changed parts have a dashed outline.
+    <ul>
+      <li><b>Home</b> shows <b>which Google account</b> is signed in, top right, with the sync status under it (frames 1-2). On 2026-11-15 the phone was on a work account and trips seemed to be missing; the email up top, plus the "no trips on this account" banner (frame 3), make that obvious on the first screen.</li>
+      <li><b>Every other screen</b> shows just the status, under the title. On a trip it sits beside Share (frames 4-5). My Trips and New Trip put it under their title the same way.</li>
+      <li><b>Tapping the status (or the email on Home)</b> opens a small account panel: the status in a sentence, who's signed in, and Sign out (frame 6). That also gives Home a way to sign out, which it doesn't have today.</li>
+      <li><b>Signing out with changes still waiting to sync would lose them</b>, so it asks first (frame 7).</li>
+      <li><b>Unchanged:</b> the ☰ menu keeps "Signed in as … / Sign out" at the bottom. Its Sign out gets the same frame-7 check.</li>
+    </ul>
+  </div>
+
+  <div class="mockup-frames">
+
+    <!-- Legend: the four states -->
+    <div class="mockup-legend">
+      <div class="mockup-frame-label">The four states (exact wording)</div>
+      <table>
+        <tr><td><span class="sync-status"><svg><use href="#s-synced"/></svg>Synced</span></td><td>Online, and every change made on this device has reached the server. <b>This is what you'll see nearly all the time.</b></td></tr>
+        <tr><td><span class="sync-status"><svg><use href="#s-syncing"/></svg>Syncing&hellip;</span></td><td>Online and a change is on its way. Only shown if it takes more than 2 seconds, so ordinary edits don't make the label flicker.</td></tr>
+        <tr><td><span class="sync-status waiting"><svg><use href="#s-waiting"/></svg>Waiting to sync</span></td><td>Changes are saved on this device but haven't reached the server: you're offline, or a change has been stuck for 10+ seconds (phones sometimes claim to be online on weak wifi). They send themselves when there's signal. <b>The only amber state</b>: it means "Dave can't see this yet".</td></tr>
+        <tr><td><span class="sync-status"><svg><use href="#s-offline"/></svg>Offline</span></td><td>No signal, nothing waiting. Everything still works; your edits and Dave's swap when you're back online.</td></tr>
+      </table>
+    </div>
+
+    <!-- 1. Home, synced -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">1 · Home: synced</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <h1 class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20"><use href="#lockup"/></svg><span class="word-out">Out</span></h1>
+          <button class="account-btn mockup-changed" type="button">
+            <span class="account-email">luveanmyers@gmail.com</span>
+            <span class="sync-status"><svg><use href="#s-synced"/></svg>Synced</span>
+          </button>
+        </header>
+        <main class="screen">
+          <div class="hero-banner"><div class="eyebrow">Continue</div><div class="trip-name">Scotland 2027</div><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div></div>
+          <div class="bento-grid">
+            <div class="tile tile-trips"><svg class="tile-icon" width="16" height="16"><use href="#i-trips"/></svg><div><div class="tile-label">My Trips</div><div class="tile-sub">1 trip saved</div></div></div>
+            <div class="tile tile-new"><svg class="tile-icon" width="16" height="16"><use href="#i-plus"/></svg><div class="tile-label">Start a New Trip</div></div>
+            <div class="tile tile-dash disabled"><svg class="tile-icon" width="16" height="16"><use href="#i-dash"/></svg><div><div class="tile-label">Dashboard</div><div class="coming-soon-badge">Coming soon</div></div></div>
+            <div class="tile tile-settings disabled"><svg class="tile-icon" width="16" height="16"><use href="#i-settings"/></svg><div><div class="tile-label">Settings</div><div class="coming-soon-badge">Coming soon</div></div></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- 2. Home, waiting to sync -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">2 · Home: offline, changes waiting</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <h1 class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20"><use href="#lockup"/></svg><span class="word-out">Out</span></h1>
+          <button class="account-btn mockup-changed" type="button">
+            <span class="account-email">luveanmyers@gmail.com</span>
+            <span class="sync-status waiting"><svg><use href="#s-waiting"/></svg>Waiting to sync</span>
+          </button>
+        </header>
+        <main class="screen">
+          <div class="hero-banner"><div class="eyebrow">Continue</div><div class="trip-name">Scotland 2027</div><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div></div>
+          <div class="bento-grid">
+            <div class="tile tile-trips"><svg class="tile-icon" width="16" height="16"><use href="#i-trips"/></svg><div><div class="tile-label">My Trips</div><div class="tile-sub">1 trip saved</div></div></div>
+            <div class="tile tile-new"><svg class="tile-icon" width="16" height="16"><use href="#i-plus"/></svg><div class="tile-label">Start a New Trip</div></div>
+            <div class="tile tile-dash disabled"><svg class="tile-icon" width="16" height="16"><use href="#i-dash"/></svg><div><div class="tile-label">Dashboard</div><div class="coming-soon-badge">Coming soon</div></div></div>
+            <div class="tile tile-settings disabled"><svg class="tile-icon" width="16" height="16"><use href="#i-settings"/></svg><div><div class="tile-label">Settings</div><div class="coming-soon-badge">Coming soon</div></div></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- 3. Home, wrong account -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">3 · Home: an account with no trips</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <h1 class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20"><use href="#lockup"/></svg><span class="word-out">Out</span></h1>
+          <button class="account-btn mockup-changed" type="button">
+            <span class="account-email">luvean@workplace.com</span>
+            <span class="sync-status"><svg><use href="#s-synced"/></svg>Synced</span>
+          </button>
+        </header>
+        <main class="screen">
+          <div class="hero-banner empty mockup-changed">
+            <div class="eyebrow">No trips on this account</div>
+            <div class="trip-name">Ready to plan your next one?</div>
+            <p class="banner-account">Signed in as <b>luvean@workplace.com</b>. Expecting trips? They may be on a different Google account.</p>
+            <button class="banner-link" type="button">Switch account</button>
+          </div>
+          <div class="bento-grid">
+            <div class="tile tile-trips"><svg class="tile-icon" width="16" height="16"><use href="#i-trips"/></svg><div><div class="tile-label">My Trips</div><div class="tile-sub">0 trips saved</div></div></div>
+            <div class="tile tile-new"><svg class="tile-icon" width="16" height="16"><use href="#i-plus"/></svg><div class="tile-label">Start a New Trip</div></div>
+            <div class="tile tile-dash disabled"><svg class="tile-icon" width="16" height="16"><use href="#i-dash"/></svg><div><div class="tile-label">Dashboard</div><div class="coming-soon-badge">Coming soon</div></div></div>
+            <div class="tile tile-settings disabled"><svg class="tile-icon" width="16" height="16"><use href="#i-settings"/></svg><div><div class="tile-label">Settings</div><div class="coming-soon-badge">Coming soon</div></div></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- 4. Trip, synced -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">4 · Trip screen: synced</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup" role="button" tabindex="0"><span class="word-set">Set</span><svg width="51" height="20"><use href="#lockup"/></svg><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+            <div class="header-meta-row">
+              <button class="share-chip" type="button"><svg><use href="#people"/></svg>Shared with 1</button>
+              <button class="sync-btn mockup-changed" type="button"><span class="sync-status"><svg><use href="#s-synced"/></svg>Synced</span></button>
+            </div>
+          </div>
+          <button class="icon-btn" aria-label="Menu"><svg width="22" height="22" fill="none"><use href="#burger"/></svg></button>
+        </header>
+        <main class="screen">
+          <div class="mockup-sample muted">(Packing list as today)</div>
+        </main>
+        <nav class="tab-bar">
+          <button class="tab-btn">Ideas</button><button class="tab-btn">Itinerary</button><button class="tab-btn active">Packing</button><button class="tab-btn">Budget</button><button class="tab-btn">Notes</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 5. Trip, waiting -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">5 · Trip screen: offline, changes waiting</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup" role="button" tabindex="0"><span class="word-set">Set</span><svg width="51" height="20"><use href="#lockup"/></svg><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+            <div class="header-meta-row">
+              <button class="share-chip" type="button"><svg><use href="#people"/></svg>Shared with 1</button>
+              <button class="sync-btn mockup-changed" type="button"><span class="sync-status waiting"><svg><use href="#s-waiting"/></svg>Waiting to sync</span></button>
+            </div>
+          </div>
+          <button class="icon-btn" aria-label="Menu"><svg width="22" height="22" fill="none"><use href="#burger"/></svg></button>
+        </header>
+        <main class="screen">
+          <div class="mockup-sample muted">(Packing list as today)</div>
+        </main>
+        <nav class="tab-bar">
+          <button class="tab-btn">Ideas</button><button class="tab-btn">Itinerary</button><button class="tab-btn active">Packing</button><button class="tab-btn">Budget</button><button class="tab-btn">Notes</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 6. Account panel -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">6 · Account panel (tap the status)</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><svg width="51" height="20"><use href="#lockup"/></svg><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+            <div class="header-meta-row">
+              <button class="share-chip" type="button"><svg><use href="#people"/></svg>Shared with 1</button>
+              <span class="sync-status waiting"><svg><use href="#s-waiting"/></svg>Waiting to sync</span>
+            </div>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel mockup-changed" role="dialog" aria-label="Sync and account">
+            <div class="share-panel-head">
+              <h2>Sync and account</h2>
+              <button class="share-close" type="button" aria-label="Close">&times;</button>
+            </div>
+            <div class="account-status-card waiting">
+              <svg><use href="#s-waiting"/></svg>
+              <div>
+                <div class="status-title">Waiting to sync</div>
+                <p>Your latest changes are saved on this device. They'll sync on their own when there's signal, and then Dave will see them.</p>
+              </div>
+            </div>
+            <div class="account-label">Signed in as</div>
+            <div class="account-panel-email">luveanmyers@gmail.com</div>
+            <p class="share-hint">You only see trips shared with this email. Missing a trip? It may be on a different Google account.</p>
+            <button class="account-signout" type="button">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Sign out with unsynced changes -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">7 · Sign out while changes are waiting</div>
+      <div class="mockup-phone">
+        <div class="mockup-confirm mockup-changed">
+          Some changes on this device haven't synced yet. If you sign out now, they'll be lost.<br><br>Sign out anyway?
+          <div class="mockup-confirm-btns"><span>Cancel</span><span>OK</span></div>
+        </div>
+        <p class="mockup-sample muted">The phone's own confirm box (like "Delete this trip?"). With nothing waiting, Sign out works straight away, as today.</p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
