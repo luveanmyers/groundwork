@@ -15,10 +15,12 @@ It's built to be **used for real**: Luvean and Dave plan and travel with it,
 starting with Scotland (July 2027). Rank work by real planning and in-country
 value. A portfolio demo is a secondary benefit, not the driver.
 
-**Sync pivot (LUV-38, decided 2026-11-14):** trips are moving from
-per-browser `localStorage` to Firebase Firestore so Luvean and Dave can both
-edit, offline, on every device. Until that ships, data lives only in
-`localStorage`. The design is in the Linear doc "SetOut — Sync Design".
+**Sync (LUV-38):** trips live in Firebase Firestore so Luvean and Dave can
+both edit, offline, on every device, with each device keeping an offline
+copy. Sign-in is Google only. `localStorage` holds only the per-device
+`setoutDevice` settings. The design is in the Linear doc "SetOut — Sync
+Design". Testing uses the `setout-dev` project; only the real site uses the
+real one (`js/firebase-config.js`).
 
 ## Roles
 
@@ -99,9 +101,9 @@ Luvean's go-ahead.
 
 ## Code conventions
 
-- **`js/storage.js` is the only file that touches storage**: `localStorage`
-  today, and Firestore once sync lands. Everything else goes through its
-  functions.
+- **`js/storage.js` is the only file the app calls for data.** Its helper
+  `js/sync.js` is the only file that talks to Firestore, and `js/auth.js` the
+  only one that talks to Firebase Auth. Nothing else touches storage.
 - **Schema changes need a migration.** Extend `migrateIdeasInState()` (numbered
   migrations) so saved data keeps working. First check whether anything
   actually reads the field (Hard-to-Change entry 7).
