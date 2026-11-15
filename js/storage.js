@@ -1,30 +1,46 @@
 /*
   storage.js
   ----------
-  This file is the ONLY place in the app that talks to localStorage.
+  This file is the ONLY place the rest of the app goes for trip data.
+  app.js calls functions like getTrips() or addPackingItem() and trusts
+  this file to handle the details.
 
-  Why keep it in one place?
-  Because localStorage only stores strings. Every time we save data we have
-  to convert our JavaScript objects into a string with JSON.stringify(),
-  and every time we read data back we have to convert it back into objects
-  with JSON.parse(). If that conversion logic were scattered across every
-  file, a typo in one spot could silently corrupt your trip data. Keeping
-  it in one module means the rest of the app never touches JSON.stringify
-  or localStorage directly - it just calls functions like getTrips() or
-  addPackingItem() and trusts this file to handle the details.
+  Where the data lives (changed in LUV-41, 2026-11):
+  Trips used to be one JSON blob in this browser's localStorage, which
+  meant a trip planned on the laptop never reached the phone, and Dave
+  could never see it. Now trips live in Firestore, a shared database,
+  and each device keeps its own offline copy of them. That's what lets
+  Luvean and Dave both edit the same trip, with or without signal.
 
-  Everything here is "offline-first" by definition: localStorage lives on
-  the phone itself, so none of this needs a network connection.
+  How this file fits in:
+  - It keeps an IN-MEMORY copy of every trip the signed-in person can
+    see (the `synced` object below). Every get...() function reads from
+    it, so reads are instant, exactly as they were with localStorage.
+  - Every change updates that copy first (so the screen changes right
+    away), then hands just the changed document to sync.js to save.
+  - sync.js listens to Firestore and calls applyRemoteTrips() /
+    applyRemoteList() below whenever data changes, here or on another
+    device, which refreshes the in-memory copy.
+
+  sync.js is the only file that talks to Firestore, and this file is
+  its only caller. It's separate only because Firebase's SDK comes as
+  JavaScript modules and this is a plain script.
+
+  What's still in localStorage: one small per-device setting (which
+  trip is open), under DEVICE_KEY. It deliberately doesn't sync - your
+  phone and laptop can have different trips open. The old trip blob
+  under "groundworkData" is left where it is and no longer read (no real
+  trips were ever stored there, so nothing is migrated).
 */
 
-const STORAGE_KEY = "groundworkData";
+const DEVICE_KEY = "setoutDevice";
 
-// This is the "shape" of a brand new, empty database. If nothing has been
-// saved yet, this is what we start from.
+// The shape of the in-memory copy. Same shape the app always used, so
+// app.js doesn't need to know anything changed.
 function emptyState() {
   return {
-    trips: [],          // [{ id, name, destination, startDate, endDate }]
-    activeTripId: null,  // which trip is currently selected in the UI
+    trips: [],          // [{ id, name, destination, startDate, endDate, memberEmails, createdBy, schemaVersion }]
+    activeTripId: null,  // which trip is open on THIS device (from DEVICE_KEY, not synced)
     packing: {},          // { [tripId]: [ {id, text, checked, category} ] }
     budget: {},            // { [tripId]: [ {id, description, amount, currency, category, date} ] }
     notes: {},               // { [tripId]: [ {id, title, body} ] }  <- confirmations, doc numbers, etc.
@@ -32,35 +48,90 @@ function emptyState() {
   };
 }
 
-// Reads the whole database out of localStorage.
-// If nothing is there yet (first time opening the app), returns emptyState().
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return emptyState();
+let synced = emptyState();
+// Who's signed in, as { uid, email } - set by sync.js. New trips are
+// created with this person as their first member.
+let syncUser = null;
+let syncReady = false;
+
+function loadDeviceSettings() {
   try {
-    const parsed = JSON.parse(raw);
-    // Merge with emptyState() so that if we add new fields in a future
-    // version of the app, old saved data doesn't break anything.
-    const state = { ...emptyState(), ...parsed };
-    // Bring any ideas saved under an older field shape up to date (see
-    // migrateIdeasInState below), and persist the result so this only
-    // has to run once per trip's data.
-    if (migrateIdeasInState(state)) saveState(state);
-    return state;
+    return JSON.parse(localStorage.getItem(DEVICE_KEY)) || {};
   } catch (err) {
-    console.error("Saved trip data was corrupted, starting fresh.", err);
-    return emptyState();
+    return {};
   }
 }
 
-// Writes the whole database back to localStorage.
-function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function saveDeviceSettings(settings) {
+  localStorage.setItem(DEVICE_KEY, JSON.stringify(settings));
+}
+
+// Kept as the name the rest of this file always used: "give me the
+// current data". It's now the in-memory copy rather than a fresh read
+// from localStorage.
+function loadState() {
+  return synced;
 }
 
 // A tiny helper for generating unique-enough IDs without any library.
+// IDs start with the current time, so sorting by ID keeps things in the
+// order they were added - which is the order Firestore hands them back.
 function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// Sends one change to sync.js. If sync.js isn't loaded (it always is
+// once someone's signed in), the change still shows in memory; it just
+// can't be saved, and says so.
+function remote(method, ...args) {
+  if (window.setoutSync) window.setoutSync[method](...args);
+  else console.warn(`Not saved (sync isn't running): ${method}`);
+}
+
+/* ----------------------- Called by sync.js ----------------------- */
+
+function setSyncUser(user) {
+  syncUser = user;
+}
+
+// Fresh, signed-in start: an empty copy, with this device's open trip
+// restored from its own settings.
+function clearSyncedData() {
+  synced = emptyState();
+  synced.activeTripId = loadDeviceSettings().activeTripId || null;
+  syncReady = false;
+  syncUser = null;
+}
+
+function applyRemoteTrips(trips) {
+  synced.trips = trips;
+  const ids = new Set(trips.map((t) => t.id));
+  // Drop the lists of any trip that's gone (deleted, or unshared).
+  ["packing", "budget", "notes", "ideas"].forEach((list) => {
+    Object.keys(synced[list]).forEach((tripId) => {
+      if (!ids.has(tripId)) delete synced[list][tripId];
+    });
+  });
+}
+
+function applyRemoteList(tripId, list, docs) {
+  if (list === "ideas") {
+    // Run the same migrations as before on anything read in, as a
+    // safety net, so a card saved by an older version of the app on
+    // some other device still has every field the screens expect.
+    const temp = { ideas: { [tripId]: docs } };
+    migrateIdeasInState(temp);
+    docs = temp.ideas[tripId];
+  }
+  synced[list][tripId] = docs;
+}
+
+function markSyncReady() {
+  syncReady = true;
+}
+
+function isSyncReady() {
+  return syncReady;
 }
 
 /* ---------------------------- Trips ---------------------------- */
@@ -74,37 +145,54 @@ function getActiveTrip() {
   return state.trips.find((t) => t.id === state.activeTripId) || null;
 }
 
+// Which trip is open is a per-device choice, so it's saved on this
+// device only, never synced.
 function setActiveTrip(tripId) {
-  const state = loadState();
-  state.activeTripId = tripId;
-  saveState(state);
+  synced.activeTripId = tripId;
+  saveDeviceSettings({ ...loadDeviceSettings(), activeTripId: tripId });
 }
 
 function createTrip({ name, destination, startDate, endDate }) {
   const state = loadState();
-  const trip = { id: makeId(), name, destination, startDate, endDate };
+  const trip = {
+    id: makeId(),
+    name,
+    destination,
+    startDate,
+    endDate,
+    // Who can see and edit this trip. The creator is the first member;
+    // sharing adds more (LUV-42). The security rules check this list.
+    memberEmails: syncUser ? [syncUser.email] : [],
+    createdBy: syncUser ? syncUser.uid : null,
+    // Lets a future version of the app tell which shape a trip was
+    // saved in, if the shape ever has to change.
+    schemaVersion: 1
+  };
   state.trips.push(trip);
-  state.activeTripId = trip.id;
   // Set up empty lists for this trip in every category.
   state.packing[trip.id] = [];
   state.budget[trip.id] = [];
   state.notes[trip.id] = [];
   state.ideas[trip.id] = [];
-  saveState(state);
+  setActiveTrip(trip.id);
+  remote("setTrip", trip.id, trip);
   return trip;
 }
 
 function deleteTrip(tripId) {
   const state = loadState();
+  // Everything inside the trip has to be deleted along with it -
+  // Firestore won't do that on its own (see sync.js).
+  const children = [];
+  ["packing", "budget", "notes", "ideas"].forEach((list) => {
+    (state[list][tripId] || []).forEach((item) => children.push({ list, id: item.id }));
+    delete state[list][tripId];
+  });
   state.trips = state.trips.filter((t) => t.id !== tripId);
-  delete state.packing[tripId];
-  delete state.budget[tripId];
-  delete state.notes[tripId];
-  delete state.ideas[tripId];
   if (state.activeTripId === tripId) {
-    state.activeTripId = state.trips.length ? state.trips[0].id : null;
+    setActiveTrip(state.trips.length ? state.trips[0].id : null);
   }
-  saveState(state);
+  remote("deleteTrip", tripId, children);
 }
 
 /* --------------------------- Packing ----------------------------- */
@@ -117,20 +205,22 @@ function getPackingItems(tripId) {
 function addPackingItem(tripId, text, category) {
   const state = loadState();
   if (!state.packing[tripId]) state.packing[tripId] = [];
-  state.packing[tripId].push({
+  const item = {
     id: makeId(),
     text,
     category: category || "General",
     checked: false
-  });
-  saveState(state);
+  };
+  state.packing[tripId].push(item);
+  remote("setItem", tripId, "packing", item);
 }
 
 function togglePackingItem(tripId, itemId) {
   const state = loadState();
   const item = (state.packing[tripId] || []).find((i) => i.id === itemId);
-  if (item) item.checked = !item.checked;
-  saveState(state);
+  if (!item) return;
+  item.checked = !item.checked;
+  remote("updateItem", tripId, "packing", itemId, { checked: item.checked });
 }
 
 function deletePackingItem(tripId, itemId) {
@@ -138,7 +228,7 @@ function deletePackingItem(tripId, itemId) {
   state.packing[tripId] = (state.packing[tripId] || []).filter(
     (i) => i.id !== itemId
   );
-  saveState(state);
+  remote("deleteItem", tripId, "packing", itemId);
 }
 
 /* ---------------------------- Budget ------------------------------ */
@@ -151,8 +241,9 @@ function getBudgetItems(tripId) {
 function addBudgetItem(tripId, entry) {
   const state = loadState();
   if (!state.budget[tripId]) state.budget[tripId] = [];
-  state.budget[tripId].push({ id: makeId(), ...entry });
-  saveState(state);
+  const item = { id: makeId(), ...entry };
+  state.budget[tripId].push(item);
+  remote("setItem", tripId, "budget", item);
 }
 
 function deleteBudgetItem(tripId, itemId) {
@@ -160,7 +251,7 @@ function deleteBudgetItem(tripId, itemId) {
   state.budget[tripId] = (state.budget[tripId] || []).filter(
     (i) => i.id !== itemId
   );
-  saveState(state);
+  remote("deleteItem", tripId, "budget", itemId);
 }
 
 /* ----------------------------- Notes ------------------------------- */
@@ -175,8 +266,9 @@ function getNotes(tripId) {
 function addNote(tripId, note) {
   const state = loadState();
   if (!state.notes[tripId]) state.notes[tripId] = [];
-  state.notes[tripId].push({ id: makeId(), ...note });
-  saveState(state);
+  const item = { id: makeId(), ...note };
+  state.notes[tripId].push(item);
+  remote("setItem", tripId, "notes", item);
 }
 
 function deleteNote(tripId, noteId) {
@@ -184,7 +276,7 @@ function deleteNote(tripId, noteId) {
   state.notes[tripId] = (state.notes[tripId] || []).filter(
     (n) => n.id !== noteId
   );
-  saveState(state);
+  remote("deleteItem", tripId, "notes", noteId);
 }
 
 /* ---------------------------- Ideas ------------------------------- */
@@ -326,7 +418,7 @@ function addIdea(tripId, input) {
   };
 
   state.ideas[tripId].push(idea);
-  saveState(state);
+  remote("setItem", tripId, "ideas", idea);
   return idea;
 }
 
@@ -345,8 +437,11 @@ function addIdea(tripId, input) {
 function updateIdea(tripId, ideaId, updates) {
   const state = loadState();
   const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
-  if (idea) Object.assign(idea, updates);
-  saveState(state);
+  if (!idea) return;
+  Object.assign(idea, updates);
+  // Only the fields that changed are sent, so if Dave edits a different
+  // field of the same card at the same time, neither edit is lost.
+  remote("updateItem", tripId, "ideas", ideaId, updates);
 }
 
 // Dedicated setter for the location sub-object. Pass only what changed,
@@ -355,8 +450,13 @@ function updateIdea(tripId, ideaId, updates) {
 function setIdeaLocation(tripId, ideaId, locationUpdates) {
   const state = loadState();
   const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
-  if (idea) idea.location = { ...idea.location, ...locationUpdates };
-  saveState(state);
+  if (!idea) return;
+  idea.location = { ...idea.location, ...locationUpdates };
+  // Dotted paths ("location.lat") change just those parts of the saved
+  // location, keeping the same "never wipe the rest" promise remotely.
+  const fields = {};
+  Object.keys(locationUpdates).forEach((key) => { fields[`location.${key}`] = locationUpdates[key]; });
+  remote("updateItem", tripId, "ideas", ideaId, fields);
 }
 
 function deleteIdea(tripId, ideaId) {
@@ -364,7 +464,7 @@ function deleteIdea(tripId, ideaId) {
   state.ideas[tripId] = (state.ideas[tripId] || []).filter(
     (i) => i.id !== ideaId
   );
-  saveState(state);
+  remote("deleteItem", tripId, "ideas", ideaId);
 }
 
 // Dedicated setter for the scheduled sub-object - same reasoning as
@@ -375,8 +475,9 @@ function deleteIdea(tripId, ideaId) {
 function scheduleIdea(tripId, ideaId, { date, slot, span }) {
   const state = loadState();
   const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
-  if (idea) idea.scheduled = { date, slot, span: span || 1 };
-  saveState(state);
+  if (!idea) return;
+  idea.scheduled = { date, slot, span: span || 1 };
+  remote("updateItem", tripId, "ideas", ideaId, { scheduled: idea.scheduled });
 }
 
 // Drag a placed card back to the sidebar, or hit its remove (x) button
@@ -385,8 +486,9 @@ function scheduleIdea(tripId, ideaId, { date, slot, span }) {
 function unscheduleIdea(tripId, ideaId) {
   const state = loadState();
   const idea = (state.ideas[tripId] || []).find((i) => i.id === ideaId);
-  if (idea) idea.scheduled = { date: null, slot: null, span: 1 };
-  saveState(state);
+  if (!idea) return;
+  idea.scheduled = { date: null, slot: null, span: 1 };
+  remote("updateItem", tripId, "ideas", ideaId, { scheduled: idea.scheduled });
 }
 
 // One-time migration: earlier versions of this app stored a single
@@ -394,8 +496,9 @@ function unscheduleIdea(tripId, ideaId) {
 // instead of the current reservationNeeded/reserved/finalized fields.
 // This converts any idea it finds in the old shape the first time it's
 // loaded, so existing trip data doesn't just disappear when the fields
-// change underneath it. Called automatically from loadState() - nothing
-// else needs to call this directly.
+// change underneath it. Called automatically on every list of ideas
+// read in from sync (applyRemoteList) - nothing else needs to call this
+// directly.
 function migrateIdeasInState(state) {
   let changed = false;
   Object.keys(state.ideas || {}).forEach((tripId) => {

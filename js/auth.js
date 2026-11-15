@@ -14,6 +14,9 @@
   person changes, including once at start-up with whoever is already
   signed in on this device.
 
+  Signing in also starts sync (sync.js), and signing out stops it, so
+  trip data is only ever loaded for the person actually signed in.
+
   Firebase remembers the sign-in on the device (in IndexedDB), and it
   reports it even with no signal. That's what lets the app open straight
   to Home offline after the first sign-in.
@@ -23,15 +26,11 @@
   the app, so they load offline after the first visit.
 */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-
-// FIREBASE_CONFIG comes from firebase-config.js: the dev project
-// everywhere except the real site.
-const app = initializeApp(FIREBASE_CONFIG);
-const auth = getAuth(app);
+import { auth } from "./firebase-init.js";
+import { startSync, stopSync } from "./sync.js";
 
 const provider = new GoogleAuthProvider();
 // Always show Google's account chooser. Without this, a device with only
@@ -48,6 +47,11 @@ window.setoutAuth = {
 };
 
 onAuthStateChanged(auth, (user) => {
-  // Hand app.js only what it needs, not Firebase's whole user object.
-  handleAuthChange(user ? { uid: user.uid, email: user.email } : null);
+  // Hand the rest of the app only what it needs, not Firebase's whole
+  // user object. Emails are compared lowercase everywhere, to match how
+  // they're stored in a trip's memberEmails.
+  const who = user ? { uid: user.uid, email: (user.email || "").toLowerCase() } : null;
+  if (who) startSync(who);
+  else stopSync();
+  handleAuthChange(who);
 });

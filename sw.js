@@ -22,7 +22,7 @@
   activate.
 */
 
-const CACHE_NAME = "setout-v3";
+const CACHE_NAME = "setout-v4";
 
 // The "app shell" - everything needed to run the app with no network at all.
 // Your actual trip DATA lives in localStorage (see storage.js), not here;
@@ -36,6 +36,8 @@ const APP_SHELL = [
   "./js/app.js",
   "./js/firebase-config.js",
   "./js/auth.js",
+  "./js/firebase-init.js",
+  "./js/sync.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/favicon-32.png"
