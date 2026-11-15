@@ -114,6 +114,16 @@ let signedInEmail = null;
 // is open) or "failed" (it closed or errored before finishing).
 let signInStatus = "idle";
 
+// ---- Sync status and the account panel (LUV-43) ----
+// What the small status label says, as reported by sync.js:
+// "synced", "syncing", "waiting" or "offline". unsyncedChanges is true
+// whenever anything on this device hasn't reached the server yet, even
+// for the split second before the label would change - it's what the
+// sign-out check uses. isAccountOpen: the "Sync and account" panel.
+let syncStatus = "synced";
+let unsyncedChanges = false;
+let isAccountOpen = false;
+
 // Grabs the single element we render everything into.
 function appRoot() {
   return document.getElementById("app");
@@ -158,6 +168,10 @@ function render() {
   } else {
     renderHomeScreen();
   }
+
+  // The account panel can open from any screen, so it's added here, on
+  // top of whichever one was just drawn.
+  if (isAccountOpen) appRoot().insertAdjacentHTML("beforeend", accountPanelHtml());
 }
 
 /* ---------------------------- Sign-in (LUV-40) --------------------------- */
@@ -175,6 +189,7 @@ function handleAuthChange(user) {
     // person left off.
     currentScreen = "home";
     isMenuOpen = false;
+    isAccountOpen = false;
   }
   render();
 }
@@ -207,8 +222,17 @@ async function handleSignIn() {
 
 // Signs out on THIS device only. Trips live in the account, so nothing
 // is lost - signing back in brings everything back.
+// Changes still waiting to sync can't be sent once signed out (the
+// server only accepts them from the person who made them), so in that
+// case it asks first. Used by the menu, the account panel, and Home's
+// "Switch account" - switching is signing out, because the sign-in
+// screen always asks which Google account to use.
 async function handleSignOut() {
+  if (unsyncedChanges && !confirm("Some changes on this device haven't synced yet. If you sign out now, they'll be lost.\n\nSign out anyway?")) {
+    return;
+  }
   isMenuOpen = false;
+  isAccountOpen = false;
   if (window.setoutAuth) await window.setoutAuth.signOut();
 }
 
@@ -260,6 +284,17 @@ function handleSyncReady() {
   render();
 }
 
+// Called by sync.js whenever the sync status changes (LUV-43). Only the
+// status label and the panel's status card are swapped out, not the
+// whole screen, so this can never interrupt typing or a drag.
+function handleSyncStatus(status, unsent) {
+  unsyncedChanges = unsent;
+  if (status === syncStatus) return;
+  syncStatus = status;
+  document.querySelectorAll("[data-sync-status]").forEach((el) => { el.outerHTML = syncStatusHtml(); });
+  document.querySelectorAll("[data-sync-card]").forEach((el) => { el.outerHTML = syncCardHtml(); });
+}
+
 // Redraws to show the other device's change - but never while you're
 // typing in a field or dragging a card. Redrawing replaces the whole
 // screen, which would wipe half-typed text or drop the card mid-drag.
@@ -306,6 +341,7 @@ function goHome() {
   currentScreen = "home";
   isMenuOpen = false;
   isShareOpen = false;
+  isAccountOpen = false;
   render();
 }
 
@@ -313,6 +349,7 @@ function goToScreen(screen) {
   currentScreen = screen;
   isMenuOpen = false;
   isShareOpen = false;
+  isAccountOpen = false;
   render();
 }
 
@@ -381,12 +418,18 @@ function activityTypeIconHtml(value) {
 /* Shared sub-page header: the lockup (tap = go Home) stacked with this
    screen's own title on the left, hamburger menu alone on the right.
    Every header except Home's is built through this - see
-   product-decisions.md for why Home is the one exception. */
-function subpageHeaderHtml(titleHtml) {
+   product-decisions.md for why Home is the one exception.
+   Under the title: the sync status (LUV-43), after any extra buttons
+   the screen passes in (the trip screen's Share). */
+function subpageHeaderHtml(titleHtml, extraHtml = "") {
   return `
     <div class="header-left">
       <div class="brand-lockup" onclick="goHome()" role="button" tabindex="0" aria-label="SetOut - go to Home">${brandLockupSvg(true)}</div>
       ${titleHtml}
+      <div class="header-meta-row">
+        ${extraHtml}
+        <button class="sync-btn" type="button" onclick="openAccountPanel()" aria-label="Sync status and account">${syncStatusHtml()}</button>
+      </div>
     </div>
     ${menuButtonHtml()}
   `;
@@ -422,6 +465,89 @@ function menuButtonHtml() {
     </button>
     ${isMenuOpen ? `<div class="menu-overlay" onclick="toggleMenu()"></div>` : ""}
   `;
+}
+
+/* ---------------------- Sync status and account (LUV-43) ------------------ */
+// The status label, Home's account button, and the "Sync and account"
+// panel either one opens. Reviewed first as mockup/sync-status-mockup.html.
+
+const SYNC_STATUS_LABELS = {
+  synced: "Synced",
+  syncing: "Syncing&hellip;",
+  waiting: "Waiting to sync",
+  offline: "Offline"
+};
+
+// The panel's longer explanation of each state.
+const SYNC_STATUS_DETAILS = {
+  synced: "Every change on this device has reached the server, so everyone on your trips sees the same thing.",
+  syncing: "Sending your latest changes now.",
+  waiting: "Your latest changes are saved on this device. They'll sync on their own when there's signal, and then the others on your trips will see them.",
+  offline: "No signal right now. Everything still works, and your changes and everyone else's swap when you're back online."
+};
+
+function syncIconSvg(status) {
+  const paths = {
+    synced: `<path d="M20 6 9 17l-5-5" stroke-width="2.4" stroke-linejoin="round"/>`,
+    syncing: `<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18.5 2.5v3.7h-3.7M5.5 21.5v-3.7h3.7" stroke-linejoin="round"/>`,
+    waiting: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linejoin="round"/>`,
+    offline: `<path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 7.2 8.6 4.7 4.7 0 0 0 7 18z" stroke-linejoin="round"/><line x1="3" y1="3" x2="21" y2="21"/>`
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">${paths[status]}</svg>`;
+}
+
+// data-sync-status marks it for handleSyncStatus() to swap in place.
+function syncStatusHtml() {
+  return `<span class="sync-status ${syncStatus}" data-sync-status>${syncIconSvg(syncStatus)}${SYNC_STATUS_LABELS[syncStatus]}</span>`;
+}
+
+function syncCardHtml() {
+  return `
+    <div class="account-status-card ${syncStatus}" data-sync-card>
+      ${syncIconSvg(syncStatus)}
+      <div>
+        <div class="status-title">${SYNC_STATUS_LABELS[syncStatus]}</div>
+        <p>${SYNC_STATUS_DETAILS[syncStatus]}</p>
+      </div>
+    </div>`;
+}
+
+// The email in two parts so that, if it's too long for the space, the
+// part before the @ gets cut short and the domain stays visible. The
+// domain is what tells a work account from a personal one.
+function accountEmailHtml(email) {
+  const at = (email || "").lastIndexOf("@");
+  if (at < 0) return `<span class="account-email"><span class="email-local">${escapeHtml(email || "")}</span></span>`;
+  return `<span class="account-email"><span class="email-local">${escapeHtml(email.slice(0, at))}</span><span class="email-domain">${escapeHtml(email.slice(at))}</span></span>`;
+}
+
+function accountPanelHtml() {
+  // Clicking the shaded area (but not the panel itself) closes it.
+  return `
+    <div class="share-overlay" onclick="if (event.target === this) closeAccountPanel()">
+      <div class="share-panel" role="dialog" aria-label="Sync and account">
+        <div class="share-panel-head">
+          <h2>Sync and account</h2>
+          <button class="share-close" type="button" aria-label="Close" onclick="closeAccountPanel()">&times;</button>
+        </div>
+        ${syncCardHtml()}
+        <div class="account-label">Signed in as</div>
+        <div class="account-panel-email">${escapeHtml(signedInEmail || "")}</div>
+        <p class="share-hint">You only see trips shared with this email. Missing a trip? It may be on a different Google account.</p>
+        <button class="account-signout" type="button" onclick="handleSignOut()">Sign out</button>
+      </div>
+    </div>`;
+}
+
+function openAccountPanel() {
+  isMenuOpen = false;
+  isAccountOpen = true;
+  render();
+}
+
+function closeAccountPanel() {
+  isAccountOpen = false;
+  render();
 }
 
 /* ========================================================================
@@ -475,13 +601,19 @@ function renderHomeScreen() {
       </div>`
     : `
       <div class="hero-banner empty">
-        <div class="eyebrow">No trip in progress</div>
+        <div class="eyebrow">No trips on this account</div>
         <div class="trip-name">Ready to plan your next one?</div>
+        <p class="banner-account">Signed in as <b>${escapeHtml(signedInEmail || "")}</b>. Expecting trips? They may be on a different Google account.</p>
+        <button class="banner-link" type="button" onclick="handleSignOut()">Switch account</button>
       </div>`;
 
   appRoot().innerHTML = `
     <header class="app-header">
       <h1 class="brand-lockup" onclick="goHome()" aria-label="SetOut">${brandLockupSvg()}</h1>
+      <button class="account-btn" type="button" onclick="openAccountPanel()" aria-label="Signed in as ${escapeHtml(signedInEmail || "")}. Sync status and account">
+        ${accountEmailHtml(signedInEmail)}
+        ${syncStatusHtml()}
+      </button>
     </header>
     <main class="screen">
       ${banner}
@@ -621,7 +753,7 @@ function confirmDeleteTrip(tripId) {
 function renderTripScreen(trip) {
   appRoot().innerHTML = `
     <header class="app-header">
-      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>${shareChipHtml(trip)}`)}
+      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>`, shareChipHtml(trip))}
     </header>
     <main class="screen" id="tab-content"></main>
     <nav class="tab-bar">

@@ -31,7 +31,8 @@
 
 import {
   collection, doc, query, where, onSnapshot,
-  setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, arrayRemove
+  setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, arrayRemove,
+  waitForPendingWrites
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 
@@ -113,9 +114,95 @@ function stopTrip(tripId) {
   tripListeners.delete(tripId);
 }
 
+/* ---------------------- Sync status (LUV-43) ---------------------- */
+// The small "Synced / Syncing... / Waiting to sync / Offline" label.
+// Reviewed first as mockup/sync-status-mockup.html.
+//
+// "Are any of my changes still unsent?" comes from Firestore's
+// waitForPendingWrites(): it settles once every change queued on this
+// device has reached the server - including changes queued before the
+// app was last closed, since Firestore keeps its queue on the device.
+// Each new write asks again, and only the latest question counts.
+//
+// "Is there signal?" comes from the browser's online/offline events.
+// Phones sometimes say they're online on wifi that goes nowhere, so a
+// change that's been stuck for 10 seconds counts as waiting anyway.
+
+const SHOW_SYNCING_AFTER_MS = 2000;  // shorter saves don't flicker the label
+const TREAT_AS_WAITING_AFTER_MS = 10000;
+
+let unsent = false;
+let unsentSince = 0;
+let pendingCheck = 0;  // which waitForPendingWrites() call is the latest
+let statusTimers = [];
+
+function currentStatus() {
+  const online = navigator.onLine;
+  if (!unsent) return online ? "synced" : "offline";
+  if (!online) return "waiting";
+  const waited = Date.now() - unsentSince;
+  if (waited >= TREAT_AS_WAITING_AFTER_MS) return "waiting";
+  if (waited >= SHOW_SYNCING_AFTER_MS) return "syncing";
+  return "synced";
+}
+
+// Tells app.js the label to show, and separately whether anything is
+// unsent at all (even under 2 seconds), which is what the sign-out
+// check needs.
+function reportStatus() {
+  handleSyncStatus(currentStatus(), unsent);
+}
+
+// Re-reports at the 2- and 10-second marks, since the label changes
+// with time even when nothing else happens.
+function restartStatusTimers() {
+  statusTimers.forEach(clearTimeout);
+  statusTimers = [SHOW_SYNCING_AFTER_MS, TREAT_AS_WAITING_AFTER_MS]
+    .map((ms) => setTimeout(reportStatus, ms + 50));
+}
+
+function checkPendingWrites() {
+  const check = ++pendingCheck;
+  if (!unsent) {
+    unsent = true;
+    unsentSince = Date.now();
+    restartStatusTimers();
+  }
+  waitForPendingWrites(db).then(() => {
+    if (check !== pendingCheck) return; // a newer write is still out
+    unsent = false;
+    statusTimers.forEach(clearTimeout);
+    reportStatus();
+  }).catch(() => {
+    // Rejected because the signed-in person changed; startSync/stopSync
+    // handle that.
+  });
+  reportStatus();
+}
+
+// Signal back: restart the clock, so the label says "Syncing..." while
+// the queue sends rather than staying on "Waiting to sync".
+window.addEventListener("online", () => {
+  if (unsent) {
+    unsentSince = Date.now();
+    restartStatusTimers();
+  }
+  reportStatus();
+});
+window.addEventListener("offline", reportStatus);
+
+function resetStatus() {
+  pendingCheck++;
+  unsent = false;
+  statusTimers.forEach(clearTimeout);
+}
+
 export function startSync(user) {
   stopSync();
   setSyncUser(user);
+  // Changes left unsent when the app was last closed are still queued.
+  // This finds out, and settles straight away if there are none.
+  checkPendingWrites();
 
   const myTrips = query(collection(db, "trips"), where("memberEmails", "array-contains", user.email));
   // includeMetadataChanges: also tell us when a trip created on this
@@ -156,6 +243,7 @@ export function stopSync() {
   knownTripIds = new Set();
   retries.clear();
   readyReported = false;
+  resetStatus();
   clearSyncedData();
 }
 
@@ -164,6 +252,7 @@ export function stopSync() {
 // failure (e.g. the rules refusing it) is logged, and Firestore itself
 // rolls the local copy back, which the listeners then show.
 function report(promise, what) {
+  checkPendingWrites();
   promise.catch((err) => console.error(`Couldn't save ${what}:`, err.code || err));
 }
 
