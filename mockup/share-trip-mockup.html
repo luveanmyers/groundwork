@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - share a trip mockup (LUV-42)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* ---- Mockup scaffolding only (phone frames side by side) ---- */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-frames { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 24px; }
+  .mockup-frame-wrap { width: 360px; max-width: 100%; }
+  .mockup-frame-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+  .mockup-phone { position: relative; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; }
+  /* The real tab bar is fixed to the bottom of the window; inside a frame it sits at the frame's bottom instead. */
+  .mockup-phone .tab-bar { position: absolute; }
+  .mockup-changed { outline: 2px dashed var(--accent-vivid); outline-offset: 3px; }
+  .mockup-confirm { margin: 18px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-card); font-size: 0.9rem; line-height: 1.5; }
+  .mockup-confirm .mockup-confirm-btns { display: flex; justify-content: flex-end; gap: 16px; margin-top: 14px; font-weight: 700; color: var(--accent-vivid); }
+
+  /* ---- NEW, preview-only styles for sharing. These move into
+     css/style.css once approved; everything else is the real stylesheet. ---- */
+  .share-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); color: var(--ink); font: 600 0.78rem var(--font-body); cursor: pointer; width: fit-content; }
+  .share-chip svg { width: 14px; height: 14px; }
+  .share-overlay { position: absolute; inset: 0; background: rgba(49, 47, 59, 0.28); display: flex; align-items: flex-end; z-index: 20; }
+  .share-panel { width: 100%; background: var(--bg); border-radius: 22px 22px 0 0; padding: 18px 18px 28px; max-height: 88%; overflow-y: auto; }
+  .share-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .share-panel-head h2 { margin: 0; font-size: 1.05rem; }
+  .share-close { background: none; border: none; font-size: 1.4rem; line-height: 1; color: var(--ink-soft); cursor: pointer; padding: 0 2px; }
+  .share-intro { color: var(--ink-soft); font-size: 0.84rem; line-height: 1.5; margin: 6px 0 14px; }
+  .member-list { background: var(--surface); border-radius: var(--radius); padding: 4px 14px; margin-bottom: 14px; }
+  .member-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; font-size: 0.9rem; }
+  .member-row + .member-row { border-top: 1px solid var(--surface-2); }
+  .member-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .member-you { color: var(--ink-soft); font-size: 0.78rem; }
+  .member-remove { background: none; border: none; color: var(--danger); font: 600 0.82rem var(--font-body); cursor: pointer; padding: 0; flex: none; }
+  .share-add-row { display: flex; gap: 8px; }
+  .share-add-row input { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: 0.95rem var(--font-body); color: var(--ink); }
+  .share-add-row button { flex: none; width: auto; margin: 0; padding: 10px 16px; }
+  .share-msg { font-size: 0.82rem; line-height: 1.5; margin-top: 8px; color: var(--danger); }
+  .share-hint { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.5; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.5 13.6c2.6.3 4.5 2.3 4.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="burger" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/></symbol>
+  </svg>
+
+  <div class="mockup-banner">MOCKUP - not the live app. Sample data only, nothing here is saved or shared.</div>
+  <div class="mockup-note">
+    <b>LUV-42: sharing a trip.</b> A new <b>Share</b> button sits under the trip's name and dates on every tab of a trip (frame 1, dashed outline).
+    It opens a panel that slides up from the bottom, listing who's on the trip, with a box to add someone by email (frames 2-4).
+    Anyone added gets <b>full edit access</b> to the whole trip (ideas, itinerary, packing, budget and notes) as soon as they sign in with Google using that email.
+    Once someone else is on the trip, the button reads "Shared with 1" (or 2, 3...).<br>
+    <b>Not in this version:</b> leaving a trip yourself (you can't remove your own row), and seeing whether the other person has signed in yet.
+    The app can't look that up without a server of its own.
+  </div>
+
+  <div class="mockup-frames">
+
+    <!-- 1. Trip header with Share button -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">1 · Trip screen: new Share button</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup" role="button" tabindex="0"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland · Jul 29, 2027 - Aug 10, 2027</div>
+            <button class="share-chip mockup-changed" type="button"><svg><use href="#people"/></svg>Share</button>
+          </div>
+          <button class="icon-btn" aria-label="Menu"><svg width="22" height="22" fill="none"><use href="#burger"/></svg></button>
+        </header>
+        <main class="screen">
+          <p class="muted empty-state">No packing items yet. Add some below.</p>
+        </main>
+        <nav class="tab-bar">
+          <button class="tab-btn">Ideas</button><button class="tab-btn">Itinerary</button><button class="tab-btn active">Packing</button><button class="tab-btn">Budget</button><button class="tab-btn">Notes</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 2. Panel, only you, typing Dave's email -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">2 · Share panel: adding Dave</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland · Jul 29, 2027 - Aug 10, 2027</div>
+            <button class="share-chip" type="button"><svg><use href="#people"/></svg>Share</button>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel">
+            <div class="share-panel-head"><h2>Share Scotland 2027</h2><button class="share-close" type="button" aria-label="Close">&times;</button></div>
+            <p class="share-intro">People on this trip can see and edit all of it: ideas, itinerary, packing, budget and notes.</p>
+            <div class="member-list">
+              <div class="member-row"><span class="member-email">you@gmail.com <span class="member-you">(you)</span></span></div>
+            </div>
+            <div class="share-add-row">
+              <input type="email" value="dave@gmail.com" placeholder="Their Google email" />
+              <button class="primary" type="button">Add</button>
+            </div>
+            <p class="share-hint">They'll see it the next time they open SetOut, signed in with Google using this email.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Panel with Dave added -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">3 · After adding: Dave is on the trip</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland · Jul 29, 2027 - Aug 10, 2027</div>
+            <button class="share-chip" type="button"><svg><use href="#people"/></svg>Shared with 1</button>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel">
+            <div class="share-panel-head"><h2>Share Scotland 2027</h2><button class="share-close" type="button" aria-label="Close">&times;</button></div>
+            <p class="share-intro">People on this trip can see and edit all of it: ideas, itinerary, packing, budget and notes.</p>
+            <div class="member-list">
+              <div class="member-row"><span class="member-email">you@gmail.com <span class="member-you">(you)</span></span></div>
+              <div class="member-row"><span class="member-email">dave@gmail.com</span><button class="member-remove" type="button">Remove</button></div>
+            </div>
+            <div class="share-add-row">
+              <input type="email" placeholder="Their Google email" />
+              <button class="primary" type="button">Add</button>
+            </div>
+            <p class="share-hint">They'll see it the next time they open SetOut, signed in with Google using this email.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Problems with the email -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">4 · If the email can't be added</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland · Jul 29, 2027 - Aug 10, 2027</div>
+            <button class="share-chip" type="button"><svg><use href="#people"/></svg>Shared with 1</button>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel">
+            <div class="share-panel-head"><h2>Share Scotland 2027</h2><button class="share-close" type="button" aria-label="Close">&times;</button></div>
+            <p class="share-intro">People on this trip can see and edit all of it: ideas, itinerary, packing, budget and notes.</p>
+            <div class="member-list">
+              <div class="member-row"><span class="member-email">you@gmail.com <span class="member-you">(you)</span></span></div>
+              <div class="member-row"><span class="member-email">dave@gmail.com</span><button class="member-remove" type="button">Remove</button></div>
+            </div>
+            <div class="share-add-row">
+              <input type="email" value="Dave@Gmail.com" />
+              <button class="primary" type="button">Add</button>
+            </div>
+            <p class="share-msg">dave@gmail.com is already on this trip.</p>
+            <p class="share-hint">Other message, for anything that isn't an email address: "That doesn't look like an email address."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Remove confirmation -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">5 · Tapping Remove asks first</div>
+      <div class="mockup-phone">
+        <div class="mockup-confirm">
+          Remove dave@gmail.com from Scotland 2027? They'll lose access to the whole trip on all their devices. You can add them back any time.
+          <div class="mockup-confirm-btns"><span>Cancel</span><span>OK</span></div>
+        </div>
+        <p class="muted small" style="margin: 0 18px;">Shown with the browser's own confirm box, the same way "Delete this trip" already asks. Its exact look depends on the phone or browser.</p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
