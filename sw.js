@@ -22,11 +22,19 @@
   activate.
 */
 
-const CACHE_NAME = "setout-v4";
+const CACHE_NAME = "setout-v5";
 
 // The "app shell" - everything needed to run the app with no network at all.
-// Your actual trip DATA lives in localStorage (see storage.js), not here;
-// this cache only holds the code/HTML/CSS/icons.
+// Trip DATA isn't here: Firestore keeps its own offline copy (see
+// firebase-init.js). This cache only holds the code/HTML/CSS/icons.
+//
+// The Firebase SDK (LUV-44) is cached up front with everything else.
+// Without it, a phone that had only opened the app once could find
+// itself offline with no sign-in or sync code to run. The version in
+// these URLs must match the imports in auth.js, firebase-init.js and
+// sync.js; changing it means changing all of them, and CACHE_NAME.
+const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
+
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -40,8 +48,24 @@ const APP_SHELL = [
   "./js/sync.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/favicon-32.png"
+  "./icons/favicon-32.png",
+  FIREBASE_SDK + "firebase-app.js",
+  FIREBASE_SDK + "firebase-auth.js",
+  FIREBASE_SDK + "firebase-firestore.js"
 ];
+
+// Which requests this worker handles at all (LUV-44): the app's own
+// files, the Firebase SDK, and Google Fonts. Everything else goes
+// straight to the network untouched - above all Firestore's and Google
+// sign-in's live traffic. Before this, every one of Firestore's sync
+// responses was saved here too: dozens per session, never read again,
+// growing without limit on the phone.
+function isAppFile(url) {
+  return url.origin === self.location.origin
+    || url.href.startsWith(FIREBASE_SDK)
+    || url.host === "fonts.googleapis.com"
+    || url.host === "fonts.gstatic.com";
+}
 
 // On install: download and cache every file in APP_SHELL. `cache: "reload"`
 // skips the browser's ordinary HTTP cache, which GitHub Pages lets hold
@@ -70,7 +94,7 @@ self.addEventListener("activate", (event) => {
 // Fetch a fresh copy of a request and save it in the cache for next time.
 // Our own files are revalidated with the server (`cache: "no-cache"`) so
 // the 10-minute HTTP cache can't hand us a stale copy. Other sites' files
-// (Google Fonts) are fetched normally - their URLs change when their
+// (the Firebase SDK, Google Fonts) are fetched normally - their URLs change when their
 // content does, so their normal caching is safe.
 function fetchAndCache(request) {
   const isOwnFile = new URL(request.url).origin === self.location.origin;
@@ -95,6 +119,7 @@ function fetchAndCache(request) {
 // cached match falls back to the cached index.html, so the app still opens.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (!isAppFile(new URL(event.request.url))) return;
 
   const refresh = fetchAndCache(event.request);
 
