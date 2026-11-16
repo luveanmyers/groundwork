@@ -2128,6 +2128,23 @@ button.primary:active {
   cursor: default;
 }
 
+/* Same stop sign when dated Lodging options are waiting in The Plan:
+   "Pick one" plus how many. Allowed to wrap, since a one-night gap is
+   only one day wide. */
+.cal-gap-flag.gap-pick {
+  white-space: normal;
+}
+.cal-gap-flag .gap-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.cal-gap-flag .gap-sub {
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+
 /* Amber warning: no dated Flight/Transport card between two stays in
    different regions. Clickable; can be marked sorted (then grey). */
 .transport-chip {

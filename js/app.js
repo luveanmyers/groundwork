@@ -2169,6 +2169,18 @@ function lodgingGapRuns(trip, stays) {
   return runs;
 }
 
+// Hotels still being debated live in The Plan, not on the calendar
+// (Luvean's call, 2026-11-15: she'll have several per region, and the
+// calendar should stay a picture of the actual trip). Only dated ones
+// count - a Lodging card with no check-in/check-out can't be matched to
+// a night. Each night with no bed then says how many are waiting.
+function planLodgingOptions(tripId) {
+  return getIdeas(tripId).filter(
+    (i) => i.activityType === "lodging" && columnKeyForIdea(i) === "plan" &&
+      i.checkInDate && i.checkOutDate && i.checkInDate < i.checkOutDate
+  );
+}
+
 // Amber transport warnings, one per pair of back-to-back stays whose
 // regions differ (ignoring capitals and stray spaces). A stay with no
 // region can't be compared, so it never triggers one. Cleared by any
@@ -2229,6 +2241,7 @@ function itineraryTabHtml(trip) {
   const gaps = {
     stays,
     lodgingRuns: lodgingGapRuns(trip, stays),
+    planLodging: planLodgingOptions(trip.id),
     transport: transportGaps(stays, itineraryIdeas, getTransportGapNotes(trip.id))
   };
 
@@ -2695,6 +2708,17 @@ function calendarNightTrackHtml(weekDayKeys, trip, gaps) {
     const when = nights === 1
       ? `the night of ${shortDateLabel(run.start)}`
       : `the nights of ${shortDateLabel(run.start)} to ${shortDateLabel(lastNightKey)}`;
+    // Options in The Plan whose stay overlaps any night of this gap.
+    const options = gaps.planLodging.filter((o) => o.checkInDate < run.end && o.checkOutDate > run.start);
+    if (options.length) {
+      const names = options.map((o) => o.title).join(", ");
+      parts.push(`
+        <div class="cal-gap-flag gap-pick${clipClasses(p)}" style="grid-row:1; grid-column:${p.column};"
+             title="${escapeHtml(`No lodging chosen for ${when}. Options in The Plan: ${names}. Move one into The Itinerary.`)}">
+          ${flagIconHtml("i-stop")}<span class="gap-lines"><span>Pick one</span><span class="gap-sub">${options.length} ${options.length === 1 ? "option" : "options"} in The Plan</span></span>
+        </div>`);
+      return;
+    }
     parts.push(`
       <div class="cal-gap-flag${clipClasses(p)}" style="grid-row:1; grid-column:${p.column};"
            title="No lodging booked for ${when}. Add a Lodging card to fix it.">
