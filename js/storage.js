@@ -179,6 +179,32 @@ function createTrip({ name, destination, startDate, endDate }) {
   return trip;
 }
 
+// The fields the Edit trip sheet can change (LUV-50). Anything else on
+// the trip doc (members, transportGaps...) has its own setter.
+const EDITABLE_TRIP_FIELDS = ["name", "destination", "startDate", "endDate"];
+
+// Saves an edit to a trip's details. Only the fields whose value really
+// changed are sent, so if Dave renames the trip while you move its
+// dates, both edits survive: Firestore's updateDoc only touches the
+// fields it's given, and each of you sent a different one. (Sending
+// the whole form would quietly put back the old name.)
+// Returns the list of changed fields, empty when nothing changed.
+function updateTripDetails(tripId, changes) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip) return [];
+  const changed = {};
+  EDITABLE_TRIP_FIELDS.forEach((field) => {
+    if (field in changes && changes[field] !== (trip[field] || "")) {
+      changed[field] = changes[field];
+    }
+  });
+  const fields = Object.keys(changed);
+  if (!fields.length) return [];
+  Object.assign(trip, changed);
+  remote("updateTrip", tripId, changed);
+  return fields;
+}
+
 function deleteTrip(tripId) {
   const state = loadState();
   // Everything inside the trip has to be deleted along with it -

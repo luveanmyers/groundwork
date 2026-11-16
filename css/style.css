@@ -1516,6 +1516,91 @@ button.primary:active {
   margin-top: 10px;
 }
 
+/* ------------------------- Editing a trip (LUV-50) ------------------------ */
+/* The Edit trip sheet - see editTripPanelHtml() in app.js and
+   mockup/edit-trip-mockup.html. It reuses the Share panel's sheet and
+   chip styles above; these are only the parts it adds. */
+.edit-panel-form {
+  margin-top: 12px;
+}
+.edit-panel-form .form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.edit-panel-form .form-actions button {
+  flex: 1;
+  margin: 0;
+}
+/* Cancel: a quiet outlined button beside the filled Save. */
+.edit-panel-form .form-actions button:not(.primary) {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--ink);
+  font: 600 1rem var(--font-body);
+  cursor: pointer;
+}
+.edit-panel-form button.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Amber note (cards that will end up outside the dates) or red error. */
+.edit-notice {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 2px 0 12px;
+}
+.edit-notice.info {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.edit-notice.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.edit-notice ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* Itinerary sidebar: cards placed on days the trip no longer covers. */
+.sidebar-outside-head {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.calendar-sidebar-card.outside {
+  opacity: 0.85;
+}
+.calendar-sidebar-card.outside.auto {
+  cursor: default;
+}
+.calendar-sidebar-card .outside-date {
+  font-size: 0.76rem;
+  color: var(--warning);
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* Itinerary tab of a trip with no dates: message plus "Add dates". */
+.empty-state-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+}
+.empty-state-action button.primary {
+  width: auto;
+  padding: 10px 20px;
+}
+
 /* --------------------- Sync status and account (LUV-43) ------------------- */
 /* The status label, Home's account button, and the "Sync and account"
    panel - see syncStatusHtml() and accountPanelHtml() in app.js, and
