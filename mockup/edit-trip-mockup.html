@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - edit a trip mockup (LUV-50)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* ---- Mockup scaffolding only (frames side by side) ---- */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-frames { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 24px; }
+  .mockup-frame-wrap { width: 360px; max-width: 100%; }
+  .mockup-frame-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+  .mockup-phone { position: relative; height: 680px; background: var(--bg); border: 1px solid var(--border); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; }
+  .mockup-phone .tab-bar { position: absolute; }
+  /* The real overlay is fixed to the window; inside a frame it fills the frame. */
+  .mockup-phone .share-overlay { position: absolute; }
+  .mockup-changed { outline: 2px dashed var(--accent-vivid); outline-offset: 3px; }
+  .mockup-phone .calendar-sidebar { width: auto; position: static; margin: 0 16px; }
+
+  /* ---- NEW, preview-only styles. These move into css/style.css once
+     approved; everything else is the real stylesheet. The edit panel
+     reuses the Share panel's sheet (.share-overlay / .share-panel). ---- */
+  .edit-panel-form { margin-top: 12px; }
+  .edit-panel-form .form-actions { display: flex; gap: 10px; margin-top: 4px; }
+  .edit-panel-form .form-actions button { flex: 1; margin: 0; }
+  .edit-notice { font-size: 0.82rem; line-height: 1.5; border-radius: 10px; padding: 10px 12px; margin: 2px 0 12px; }
+  .edit-notice.info { background: var(--warning-soft); color: var(--warning); }
+  .edit-notice.error { background: var(--danger-soft); color: var(--danger); }
+  .edit-notice ul { margin: 6px 0 0; padding-left: 18px; }
+  .sidebar-outside-head { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.88rem; font-weight: 700; }
+  .calendar-sidebar-card.outside { opacity: 0.85; }
+  .calendar-sidebar-card .outside-date { font-size: 0.76rem; color: var(--warning); margin-top: 4px; font-weight: 600; }
+  .empty-state-action { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0 24px; }
+  .empty-state-action button { width: auto; padding: 10px 20px; }
+</style>
+</head>
+<body>
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.5 13.6c2.6.3 4.5 2.3 4.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="burger" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/></symbol>
+  </svg>
+
+  <div class="mockup-banner">MOCKUP - not the live app. Sample data only, nothing here is saved.</div>
+  <div class="mockup-note">
+    <b>LUV-50: edit a trip after it's created.</b> A new <b>Edit</b> button sits beside Share under the trip's name, on every tab (frame 1, dashed outline).
+    It opens the same slide-up sheet as Share, holding the New Trip form's four fields, filled in: name, destination, start and end date (frame 2).<br>
+    <b>Shrinking the dates never deletes or moves anything.</b> A card placed on a day that's no longer in the trip keeps its day and slot.
+    It waits in a new <b>Outside the trip dates</b> group in Itinerary Building Blocks (frame 5) until you drag it back onto the calendar or widen the dates again.
+    So instead of an "are you sure?" pop-up, the sheet shows a note naming what will end up outside (frame 3).<br>
+    <b>Today's bug this also fixes:</b> a card dated outside the trip currently disappears from both the calendar and the sidebar.
+    And a trip created without dates gets an <b>Add dates</b> button on its Itinerary tab (frame 6), so it's no longer stuck.
+  </div>
+
+  <div class="mockup-frames">
+
+    <!-- 1. Header with Edit -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">1 · Trip screen: new Edit button</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup" role="button" tabindex="0"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+            <div class="header-meta-row">
+              <button class="share-chip mockup-changed" type="button"><svg><use href="#pencil"/></svg>Edit</button>
+              <button class="share-chip" type="button"><svg><use href="#people"/></svg>Shared with 1</button>
+              <button class="sync-btn" type="button"><span class="sync-status synced">Synced</span></button>
+            </div>
+          </div>
+          <button class="icon-btn" aria-label="Menu"><svg width="22" height="22" fill="none"><use href="#burger"/></svg></button>
+        </header>
+        <main class="screen">
+          <p class="muted empty-state">No packing items yet. Add some below.</p>
+        </main>
+        <nav class="tab-bar">
+          <button class="tab-btn">Ideas</button><button class="tab-btn">Itinerary</button><button class="tab-btn active">Packing</button><button class="tab-btn">Budget</button><button class="tab-btn">Notes</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 2. Edit sheet, nothing changed yet -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">2 · Edit sheet: current details filled in</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel">
+            <div class="share-panel-head"><h2>Edit trip</h2><button class="share-close" type="button" aria-label="Close">&times;</button></div>
+            <form class="form edit-panel-form" onsubmit="return false">
+              <label>Trip name <input type="text" value="Scotland 2027" /></label>
+              <label>Destination <input type="text" value="Scotland" /></label>
+              <div class="row">
+                <label>Start date <input type="date" value="2027-07-29" /></label>
+                <label>End date <input type="date" value="2027-08-10" /></label>
+              </div>
+              <div class="form-actions">
+                <button type="button">Cancel</button>
+                <button class="primary" type="button">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Shrinking the dates: the note -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">3 · Shrinking: note, no pop-up</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel">
+            <div class="share-panel-head"><h2>Edit trip</h2><button class="share-close" type="button" aria-label="Close">&times;</button></div>
+            <form class="form edit-panel-form" onsubmit="return false">
+              <label>Trip name <input type="text" value="Scotland 2027" /></label>
+              <label>Destination <input type="text" value="Scotland" /></label>
+              <div class="row">
+                <label>Start date <input type="date" value="2027-07-29" /></label>
+                <label>End date <input type="date" value="2027-08-07" /></label>
+              </div>
+              <div class="edit-notice info mockup-changed">
+                2 cards on the calendar fall outside these dates. They'll keep their day and wait under <b>Outside the trip dates</b> in Itinerary Building Blocks:
+                <ul><li>Skye boat tour (Aug 8)</li><li>Hotel du Vin Glasgow (Aug 8 - 10)</li></ul>
+              </div>
+              <div class="form-actions">
+                <button type="button">Cancel</button>
+                <button class="primary" type="button">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Errors -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">4 · Can't save: dates don't make sense</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 10, 2027</div>
+          </div>
+        </header>
+        <div class="share-overlay">
+          <div class="share-panel">
+            <div class="share-panel-head"><h2>Edit trip</h2><button class="share-close" type="button" aria-label="Close">&times;</button></div>
+            <form class="form edit-panel-form" onsubmit="return false">
+              <label>Trip name <input type="text" value="Scotland 2027" /></label>
+              <label>Destination <input type="text" value="Scotland" /></label>
+              <div class="row">
+                <label>Start date <input type="date" value="2027-08-12" /></label>
+                <label>End date <input type="date" value="2027-08-10" /></label>
+              </div>
+              <div class="edit-notice error mockup-changed">The end date is before the start date.</div>
+              <div class="form-actions">
+                <button type="button">Cancel</button>
+                <button class="primary" type="button" disabled style="opacity:.5">Save</button>
+              </div>
+            </form>
+            <p class="share-hint">Other messages here: "Give the trip a name." and "Add both dates, or leave both blank."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Sidebar after shrinking -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">5 · Itinerary: Outside the trip dates</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Scotland 2027</h1><div class="muted small">Scotland &middot; Jul 29, 2027 - Aug 7, 2027</div>
+          </div>
+        </header>
+        <div class="calendar-sidebar">
+          <h2>Itinerary Building Blocks</h2>
+          <div class="muted small">Cards in The Itinerary column without a day yet. Drag one onto the calendar, or drag a placed card back here to unschedule it.</div>
+          <div class="calendar-sidebar-card"><span class="pill pill-activity">Food</span><div class="row-title">The Kitchin</div></div>
+          <div class="sidebar-outside-head mockup-changed">Outside the trip dates</div>
+          <div class="muted small">Still saved on their day. Drag one onto the calendar, or change the trip's dates.</div>
+          <div class="calendar-sidebar-card outside"><span class="pill pill-activity">Explore</span><div class="row-title">Skye boat tour</div><div class="outside-date">Aug 8 &middot; Morning</div></div>
+          <div class="calendar-sidebar-card outside" style="cursor:default"><span class="pill pill-activity">Lodging</span><div class="row-title">Hotel du Vin Glasgow</div><div class="outside-date">Aug 8 - 10 &middot; places itself from its check-in date</div></div>
+        </div>
+        <nav class="tab-bar">
+          <button class="tab-btn">Ideas</button><button class="tab-btn active">Itinerary</button><button class="tab-btn">Packing</button><button class="tab-btn">Budget</button><button class="tab-btn">Notes</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 6. Trip without dates -->
+    <div class="mockup-frame-wrap">
+      <div class="mockup-frame-label">6 · Trip with no dates: Add dates</div>
+      <div class="mockup-phone">
+        <header class="app-header">
+          <div class="header-left">
+            <div class="brand-lockup"><span class="word-set">Set</span><span class="word-out">Out</span></div>
+            <h1 class="page-title">Ireland someday</h1><div class="muted small">Ireland</div>
+            <div class="header-meta-row">
+              <button class="share-chip" type="button"><svg><use href="#pencil"/></svg>Edit</button>
+              <button class="share-chip" type="button"><svg><use href="#people"/></svg>Share</button>
+              <button class="sync-btn" type="button"><span class="sync-status synced">Synced</span></button>
+            </div>
+          </div>
+        </header>
+        <main class="screen">
+          <div class="empty-state-action">
+            <p class="muted empty-state">Add a start and end date to this trip before building its calendar.</p>
+            <button class="primary mockup-changed" type="button">Add dates</button>
+          </div>
+        </main>
+        <nav class="tab-bar">
+          <button class="tab-btn">Ideas</button><button class="tab-btn active">Itinerary</button><button class="tab-btn">Packing</button><button class="tab-btn">Budget</button><button class="tab-btn">Notes</button>
+        </nav>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
