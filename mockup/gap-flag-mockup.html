@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SetOut - Lodging/transport gap flag (LUV-29) v3</title>
+<title>SetOut - Lodging/transport gap flag (LUV-29) v4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
@@ -70,6 +70,21 @@
     overflow: hidden;
   }
 
+  /* v4: two-line stop sign when options are waiting in The Plan. */
+  .cal-gap-flag .gap-lines { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+  .cal-gap-flag.gap-pick { white-space: normal; }
+  .cal-gap-flag .gap-sub { font-weight: 600; font-size: 0.68rem; }
+  .cal-night-track { row-gap: 4px; }
+  /* v4 case 2: two stays on the same night. */
+  .cal-placed-card.lodging-bar.has-overlap { border-color: var(--danger); }
+  .overlap-chip {
+    display: flex; align-items: center; gap: 4px; margin-top: 2px;
+    padding: 1px 6px 1px 3px; border-radius: var(--radius-pill);
+    font-size: 0.7rem; font-weight: 700; white-space: nowrap; align-self: flex-start;
+    border: 1px dashed var(--danger); background: var(--danger-soft); color: var(--danger);
+    cursor: default;
+  }
+
   /* Transport: amber warning chip. Can be marked sorted. */
   .transport-chip {
     display: flex;
@@ -107,20 +122,20 @@
 </head>
 <body>
 
-<div class="mockup-banner">MOCKUP v3 - review only (LUV-29). Nothing here saves. Uses the real css/style.css.</div>
+<div class="mockup-banner">MOCKUP v4 - review only (LUV-29). Nothing here saves. Uses the real css/style.css.</div>
 
 <div class="mockup-note">
-  <b>What changed from v2</b>
+  <b>What changed from v3</b>
   <ul>
-    <li><b>Each day in the bottom row is split in half: morning on the left, tonight on the right.</b> A stay starts in the right half of its check-in day and ends in the left half of its check-out day. On a changeover day you see both: the place you check out of (left) and where you sleep that night (right). <b>Look at Fri Jul 16:</b> Portree ends on the left ("Out 10:00am"), Glasgow starts on the right ("In 3:00pm").</li>
-    <li><b>Lodging gaps are red stop signs.</b> They sit in the "tonight" half of the day with no bed, through the next morning. They can't be dismissed.</li>
-    <li><b>Transport is an amber warning.</b> Click it to mark it sorted (it turns grey and shows your note) or to add a Transport card.</li>
+    <li><b>1. Hotels you're still debating (your pick).</b> Candidates live in The Plan, not on the calendar. If a night has no bed but there are Lodging cards in The Plan whose dates cover it, the stop sign reads <b>"Pick one: 2 options in The Plan"</b> instead of "No lodging". Hover it to see their names. <b>Compare Jul 9</b> (two options waiting) <b>with Jul 13</b> (nothing found yet).</li>
+    <li><b>2. Two stays in The Itinerary on the same night (needs your yes or no).</b> The current build draws them on top of each other, so one hides. Here both show, stacked, and each gets a red <b>"Pick one"</b> sign. <b>See Fri Jul 16:</b> Glasgow hotel and Glasgow flat, both booked for the night of Jul 16.</li>
+    <li>Everything else is as you approved in v3: half-day bottom row, red stop signs for lodging, amber for transport.</li>
   </ul>
   <div class="legend">
     <span style="color:var(--danger);"><svg class="flag-icon"><use href="#i-stop"/></svg> Must fix: no lodging</span>
     <span style="color:var(--warning);"><svg class="flag-icon"><use href="#i-warn"/></svg> Heads-up: transport, can be marked sorted</span>
   </div>
-  <div style="margin-top:8px;"><b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027. Edinburgh flat Jul 6&rarr;9, Loch Ness B&amp;B Jul 10&rarr;13, Portree cottage Jul 14&rarr;16, Glasgow hotel Jul 16&rarr;17. Nights of Jul 9 and Jul 13 have no bed. The Train to Inverness covers Edinburgh &rarr; Highlands. Skye &rarr; Glasgow is already marked sorted.</div>
+  <div style="margin-top:8px;"><b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027. Edinburgh flat Jul 6&rarr;9, Loch Ness B&amp;B Jul 10&rarr;13, Portree cottage Jul 14&rarr;16, Glasgow hotel and Glasgow flat both Jul 16&rarr;17. Nights of Jul 9 and Jul 13 have no bed; The Plan has two dated options for Jul 9 (Stirling B&amp;B, Linlithgow Inn). The Train to Inverness covers Edinburgh &rarr; Highlands. Skye &rarr; Glasgow is already marked sorted.</div>
 </div>
 
 <div class="mockup-switch">
@@ -200,8 +215,8 @@
               <div class="placed-time-row" style="padding-left:0;">In 3:00pm &middot; Out 10:00am</div>
             </div>
             <!-- No bed the night of Jul 9: Jul 9 tonight (12) -> Jul 10 morning (13) -->
-            <div class="cal-gap-flag" style="grid-row:1; grid-column:12 / 14;" title="No lodging booked for the night of Jul 9. This needs a Lodging card.">
-              <svg class="flag-icon"><use href="#i-stop"/></svg><span>No lodging</span>
+            <div class="cal-gap-flag gap-pick" style="grid-row:1; grid-column:12 / 14;" title="No lodging chosen for the night of Jul 9. Options in The Plan: Stirling B&amp;B, Linlithgow Inn. Move one into The Itinerary.">
+              <svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 options in The Plan</span></span>
             </div>
             <!-- Loch Ness: in Jul 10 (d6, tonight col 14), continues into week 2 -->
             <div class="cal-placed-card allday-bar lodging-bar stay-continues" style="grid-row:1; grid-column:14 / 15;">
@@ -278,10 +293,18 @@
               <div class="transport-chip" id="chip-skye" data-from="Highlands" data-to="Skye" onclick="openTransport(event, this)" title="Highlands to Skye: no dated Flight or Transport card yet. Click to mark it sorted or add one."><svg class="flag-icon"><use href="#i-warn"/></svg><span>Transport: Highlands &rarr; Skye</span></div>
             </div>
             <!-- Glasgow: in Jul 16 (tonight col 12) -> out Jul 17 (d6, morning col 13) -->
-            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:12 / 14;">
+            <div class="cal-placed-card allday-bar lodging-bar has-overlap" style="grid-row:1; grid-column:12 / 14;">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Glasgow hotel</span></span></div>
               <div class="placed-time-row" style="padding-left:0;">In 3pm &middot; Out 11am</div>
+              <div class="overlap-chip" title="Glasgow flat is also booked for the night of Jul 16. Keep one and move the other out of The Itinerary."><svg class="flag-icon"><use href="#i-stop"/></svg><span>Pick one</span></div>
               <div class="transport-chip sorted" id="chip-glasgow" data-from="Skye" data-to="Glasgow" data-note="Rental car, drop off in Glasgow" onclick="openTransport(event, this)" title="Skye to Glasgow: sorted. Rental car, drop off in Glasgow">&#10003; <span>Rental car, drop off in Glasgow</span></div>
+            </div>
+            <!-- Case 2: a second stay for the same night goes on its own line
+                 (grid-row 2) instead of on top of the first. -->
+            <div class="cal-placed-card allday-bar lodging-bar has-overlap" style="grid-row:2; grid-column:12 / 14;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Glasgow flat</span></span></div>
+              <div class="placed-time-row" style="padding-left:0;">In 4pm &middot; Out 10am</div>
+              <div class="overlap-chip" title="Glasgow hotel is also booked for the night of Jul 16. Keep one and move the other out of The Itinerary."><svg class="flag-icon"><use href="#i-stop"/></svg><span>Pick one</span></div>
             </div>
             <!-- Jul 17 tonight (col 14) stays empty: last day of the trip, no night. -->
           </div>
