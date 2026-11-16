@@ -1192,15 +1192,16 @@ function ideaFormHtml(trip) {
       </div>
       <div class="row" data-activity-fields="flight,transport" style="display:none">
         <label>Departure date
-          <input name="departureDate" type="date" />
+          <input name="departureDate" type="date" oninput="refreshAddFormDateNotes(this.form)" />
         </label>
         <label>Departure time
           <input name="departureTime" type="time" />
         </label>
       </div>
+      <div data-activity-fields="flight,transport" data-date-note style="display:none"></div>
       <div class="row" data-activity-fields="flight,transport" style="display:none">
         <label>Arrival date
-          <input name="arrivalDate" type="date" />
+          <input name="arrivalDate" type="date" oninput="refreshAddFormDateNotes(this.form)" />
         </label>
         <label>Arrival time
           <input name="arrivalTime" type="time" />
@@ -1208,12 +1209,13 @@ function ideaFormHtml(trip) {
       </div>
       <div class="row" data-activity-fields="lodging" style="display:none">
         <label>Check-in date
-          <input name="checkInDate" type="date" />
+          <input name="checkInDate" type="date" oninput="refreshAddFormDateNotes(this.form)" />
         </label>
         <label>Check-out date
-          <input name="checkOutDate" type="date" />
+          <input name="checkOutDate" type="date" oninput="refreshAddFormDateNotes(this.form)" />
         </label>
       </div>
+      <div data-activity-fields="lodging" data-date-note style="display:none"></div>
       <div class="row" data-activity-fields="lodging" style="display:none">
         <label>Check-in time <span class="muted small">(optional)</span>
           <input name="checkInTime" type="time" />
@@ -1281,6 +1283,7 @@ function handleAddFormActivityTypeChange(select) {
     const relevantTypes = group.dataset.activityFields.split(",");
     group.style.display = relevantTypes.includes(select.value) ? "" : "none";
   });
+  refreshAddFormDateNotes(form);
 }
 
 // The filter bar shown above the board - a slim single row of plain
@@ -1402,6 +1405,77 @@ function normalizedLinkHref(link) {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+/* ---- Card dates outside the trip (LUV-24) ---- */
+// A Flight/Transport/Lodging date outside the trip's start..end gets an
+// amber note under it. It's a note, not a block: an overnight flight
+// can leave the day before the trip's first day, and a booking can be
+// recorded before the trip's dates are final. The note links to the
+// Edit trip sheet (LUV-50) for when it's the trip's dates that are off.
+
+const TRIP_DATE_FIELDS = {
+  flight: [["departureDate", "Departure"], ["arrivalDate", "Arrival"]],
+  transport: [["departureDate", "Departure"], ["arrivalDate", "Arrival"]],
+  lodging: [["checkInDate", "Check-in"], ["checkOutDate", "Check-out"]]
+};
+
+function shortDate(isoDate) {
+  return parseLocalDate(isoDate).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// `values` is the card, or the add form's fields in the same shape.
+// Returns "" when there's nothing to say.
+function dateRangeNoteHtml(trip, values) {
+  const fields = TRIP_DATE_FIELDS[values.activityType];
+  if (!fields || !trip.startDate || !trip.endDate) return "";
+
+  // ISO dates compare correctly as plain strings.
+  const sentences = [];
+  fields.forEach(([key, label]) => {
+    const date = values[key];
+    if (!date) return;
+    if (date < trip.startDate) sentences.push(`${label} (${shortDate(date)}) is before this trip starts (${shortDate(trip.startDate)})`);
+    else if (date > trip.endDate) sentences.push(`${label} (${shortDate(date)}) is after this trip ends (${shortDate(trip.endDate)})`);
+  });
+  if (!sentences.length) return "";
+
+  // Where the card would sit on the calendar, by the same rule the
+  // calendar uses (a Flight/Transport on its departure day, a Lodging
+  // stay across check-in..check-out), so the note can say whether it
+  // will still show there.
+  let placement = null;
+  if (values.activityType === "lodging" && values.checkInDate && values.checkOutDate && values.checkOutDate >= values.checkInDate) {
+    placement = { date: values.checkInDate, slot: "lodging", span: daysBetweenDates(values.checkInDate, values.checkOutDate) + 1 };
+  } else if (values.activityType !== "lodging" && values.departureDate) {
+    placement = { date: values.departureDate, slot: "morning", span: 1 };
+  }
+  let text;
+  if (placement && isPlacedOutsideTrip({ scheduled: placement }, trip.startDate, trip.endDate)) {
+    text = sentences.length === 1
+      ? `${sentences[0]}, so this card won't show on the calendar.`
+      : `${sentences.join(". ")}. This card won't show on the calendar.`;
+  } else {
+    text = `${sentences.join(". ")}.`;
+    if (values.activityType === "lodging" && placement) text += " The nights inside the trip still show on the calendar.";
+  }
+
+  return `
+    <div class="date-range-note">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-warn"/></svg>
+      <span>${escapeHtml(text)} <button class="link-btn" type="button" onclick="openEditTripPanel()">Change trip dates</button></span>
+    </div>`;
+}
+
+// The add form isn't redrawn while you type, so its notes are filled
+// in here whenever a date (or the category) changes.
+function refreshAddFormDateNotes(form) {
+  const trip = getActiveTrip();
+  if (!trip) return;
+  const values = { activityType: form.activityType.value };
+  ["departureDate", "arrivalDate", "checkInDate", "checkOutDate"].forEach((key) => { values[key] = form[key].value; });
+  const html = dateRangeNoteHtml(trip, values);
+  form.querySelectorAll("[data-date-note]").forEach((slot) => { slot.innerHTML = html; });
+}
+
 // Type-specific logistics fields, editable inline like every other
 // field in the card - shown only when Category is Flight/Transport
 // (shared From/To + departure/arrival date+time) or Lodging
@@ -1433,6 +1507,7 @@ function logisticsFieldsHtml(trip, idea) {
           <input type="time" value="${escapeHtml(idea.departureTime)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'departureTime', this.value)" />
         </label>
       </div>
+      ${dateRangeNoteHtml(trip, idea)}
       <div class="idea-edit-row">
         <label class="idea-edit-field">
           <span>Arrival date</span>
@@ -1457,6 +1532,7 @@ function logisticsFieldsHtml(trip, idea) {
           <input type="date" value="${escapeHtml(idea.checkOutDate)}" onchange="handleUpdateIdeaField('${trip.id}', '${idea.id}', 'checkOutDate', this.value)" />
         </label>
       </div>
+      ${dateRangeNoteHtml(trip, idea)}
       <div class="idea-edit-row">
         <label class="idea-edit-field">
           <span>Check-in time <span class="muted small">(optional)</span></span>

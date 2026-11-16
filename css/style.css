@@ -1588,6 +1588,31 @@ button.primary:active {
   font-weight: 600;
 }
 
+/* A Flight/Transport/Lodging date outside the trip (LUV-24): a note,
+   not an error - the date still saves. See dateRangeNoteHtml(). */
+.date-range-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 2px 0 10px;
+}
+.date-range-note svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 1px;
+}
+.date-range-note .link-btn {
+  font-size: 0.8rem;
+  color: var(--warning);
+}
+
 /* Itinerary tab of a trip with no dates: message plus "Add dates". */
 .empty-state-action {
   display: flex;
