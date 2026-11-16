@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - dates outside the trip mockup (LUV-24)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* Mockup-only scaffolding. Everything inside the numbered sections
+     uses the real classes from css/style.css; the rules here only lay
+     the sections out on one page. */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-wrap { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; }
+  .mockup-section-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 28px 0 10px; }
+  .mockup-changed { outline: 2px dashed var(--accent-vivid); outline-offset: 3px; border-radius: 4px; }
+  .mockup-form-wrap { max-width: 640px; }
+  .mockup-cards { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .mockup-cards > * { width: 340px; max-width: 100%; }
+  .cal-edit-popover.mockup-static { position: static; max-height: none; }
+
+  /* ---- NEW, preview-only styles. These move into css/style.css once
+     approved; everything else is the real stylesheet. ---- */
+  .date-range-note { display: flex; gap: 8px; align-items: flex-start; font-size: 0.8rem; line-height: 1.45; color: var(--warning); background: var(--warning-soft); border-radius: 10px; padding: 8px 10px; margin: 2px 0 10px; }
+  .date-range-note svg { width: 15px; height: 15px; flex: none; margin-top: 1px; }
+  .date-range-note .link-btn { font-size: 0.8rem; color: var(--warning); text-decoration: underline; padding: 0; }
+</style>
+</head>
+<body>
+  <svg style="display:none" aria-hidden="true">
+    <symbol id="i-warn" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M10.3 3.2a2 2 0 0 1 3.4 0l8.6 15a2 2 0 0 1-1.7 3H3.4a2 2 0 0 1-1.7-3z"/><rect x="11" y="8.5" width="2" height="6.5" rx="1" fill="#fff" stroke="none"/><circle cx="12" cy="17.6" r="1.2" fill="#fff" stroke="none"/></symbol>
+  </svg>
+  <div class="mockup-banner">MOCKUP - not the live app. Sample Scotland data only (trip dates Jul 29 - Aug 10, 2027), nothing here is saved.</div>
+  <div class="mockup-note">
+    <b>LUV-24: dates outside the trip.</b> The only date pickers on cards are the Flight/Transport departure and arrival dates and the Lodging check-in and check-out dates.
+    Plain activities have no date field: they get a day by being dragged onto the calendar, which already only accepts days inside the trip.<br>
+    <b>Recommended: warn, don't block.</b> Any of those dates outside the trip's range gets an amber note right under it, and the date still saves.
+    The note says whether the card will still show on the calendar, and has a <b>Change trip dates</b> link that opens the Edit trip sheet (LUV-50).
+    The same note shows everywhere the fields appear: the add form (1), the card on the Ideas tab (2) and the calendar popover (3).<br>
+    <b>Why not block?</b> The case it would break is Scotland's own first card: an overnight flight that leaves the day <i>before</i> the trip's first day.
+    You may also want to record a booking before the trip's dates are final. Blocking would mean changing the trip's dates first, every time.
+    The alternative is described at the bottom (4).
+  </div>
+
+  <div class="mockup-wrap">
+
+    <!-- 1. Add form -->
+    <div class="mockup-section-title">1 · Ideas tab - add form, a Flight leaving the day before the trip</div>
+    <div class="mockup-form-wrap">
+      <form class="card form" onsubmit="event.preventDefault()">
+        <label>Title <input type="text" value="Flight to Edinburgh" /></label>
+        <div class="row">
+          <label>Category <select><option selected>Flight</option></select></label>
+          <label>Style <select><option selected>Guided</option></select></label>
+        </div>
+        <div class="row">
+          <label>From <input type="text" value="JFK" /></label>
+          <label>To <input type="text" value="EDI" /></label>
+        </div>
+        <div class="row">
+          <label>Departure date <input type="date" value="2027-07-28" /></label>
+          <label>Departure time <input type="time" value="21:40" /></label>
+        </div>
+        <div class="date-range-note mockup-changed">
+          <svg><use href="#i-warn"/></svg>
+          <span>Departure (Jul 28) is before this trip starts (Jul 29), so this card won't show on the calendar. <button class="link-btn" type="button">Change trip dates</button></span>
+        </div>
+        <div class="row">
+          <label>Arrival date <input type="date" value="2027-07-29" /></label>
+          <label>Arrival time <input type="time" value="09:55" /></label>
+        </div>
+        <button class="primary" type="submit">Add idea</button>
+      </form>
+    </div>
+
+    <!-- 2. Kanban card -->
+    <div class="mockup-section-title">2 · Ideas tab - Lodging card, check-out after the trip ends</div>
+    <div class="mockup-cards">
+      <div class="kanban-card is-expanded" draggable="false">
+        <div class="kanban-card-header">
+          <div class="kanban-card-title-row">
+            <span class="kanban-chevron is-expanded">&#9656;</span>
+            <span class="kanban-card-title">Hotel du Vin Glasgow</span>
+          </div>
+          <div class="kanban-card-actions">
+            <button class="kanban-move-btn" type="button" title="Move back to The Plan">&larr;</button>
+            <button class="icon-btn danger" type="button" aria-label="Delete idea">&times;</button>
+          </div>
+        </div>
+        <div class="kanban-card-collapsed-meta">
+          <span class="kanban-card-region">&#128205; Glasgow</span>
+          <span class="pill pill-activity">Lodging</span>
+        </div>
+        <div class="kanban-card-body">
+          <div class="idea-edit-fields">
+            <div class="idea-edit-row">
+              <label class="idea-edit-field"><span>Check-in date</span><input type="date" value="2027-08-08" /></label>
+              <label class="idea-edit-field"><span>Check-out date</span><input type="date" value="2027-08-12" /></label>
+            </div>
+            <div class="date-range-note mockup-changed">
+              <svg><use href="#i-warn"/></svg>
+              <span>Check-out (Aug 12) is after this trip ends (Aug 10). The nights inside the trip still show on the calendar. <button class="link-btn" type="button">Change trip dates</button></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Calendar popover -->
+      <div>
+        <div class="mockup-section-title" style="margin-top:0">3 · Itinerary tab - calendar popover</div>
+        <div class="cal-edit-popover mockup-static">
+          <div class="cal-edit-popover-head">
+            <span class="cal-edit-popover-title">Hotel du Vin Glasgow</span>
+            <button type="button" class="cal-edit-popover-close" title="Close">&times;</button>
+          </div>
+          <div class="idea-edit-fields">
+            <div class="idea-edit-row">
+              <label class="idea-edit-field"><span>Check-in date</span><input type="date" value="2027-08-08" /></label>
+              <label class="idea-edit-field"><span>Check-out date</span><input type="date" value="2027-08-12" /></label>
+            </div>
+            <div class="date-range-note mockup-changed">
+              <svg><use href="#i-warn"/></svg>
+              <span>Check-out (Aug 12) is after this trip ends (Aug 10). The nights inside the trip still show on the calendar. <button class="link-btn" type="button">Change trip dates</button></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Alternative -->
+    <div class="mockup-section-title">4 · Alternative (not recommended): block the dates</div>
+    <p class="muted small" style="max-width:720px; line-height:1.6;">
+      The date pickers would grey out every day outside Jul 29 - Aug 10, so they can't be picked at all, and no note is needed.
+      The overnight flight in (1) couldn't be entered with its real departure date until the trip's start date moved to Jul 28.
+      Dates already saved outside the range would still need the note, since a picker can't undo a date picked before the limit existed.
+    </p>
+
+  </div>
+</body>
+</html>
