@@ -39,7 +39,7 @@ const DEVICE_KEY = "setoutDevice";
 // app.js doesn't need to know anything changed.
 function emptyState() {
   return {
-    trips: [],          // [{ id, name, destination, startDate, endDate, memberEmails, createdBy, schemaVersion }]
+    trips: [],          // [{ id, name, destination, startDate, endDate, memberEmails, createdBy, schemaVersion, transportGaps? }]
     activeTripId: null,  // which trip is open on THIS device (from DEVICE_KEY, not synced)
     packing: {},          // { [tripId]: [ {id, text, checked, category} ] }
     budget: {},            // { [tripId]: [ {id, description, amount, currency, category, date} ] }
@@ -223,6 +223,44 @@ function removeTripMember(tripId, email) {
   if (!trip) return;
   trip.memberEmails = (trip.memberEmails || []).filter((e) => e !== email);
   remote("removeMember", tripId, email);
+}
+
+/* ---------------- Transport gap notes (LUV-29) ---------------- */
+// The calendar shows an amber "Transport" warning when two stays in a
+// row are in different regions and no dated Flight or Transport card
+// sits between them. Often nothing needs booking (a rental car for the
+// whole trip, a local train), so the warning can be marked "sorted"
+// with a note. That choice is the only part of the gap flags that's
+// saved - the warnings themselves are worked out fresh on every render.
+//
+// Saved on the trip document as a map, keyed by the two Lodging cards
+// the warning sits between:
+//   transportGaps: { "<fromLodgingId>__<toLodgingId>": { note: "Rental car" } }
+// Keyed by card ids on purpose: replace or delete either stay and the
+// key no longer matches, so the warning comes back, because the travel
+// situation really has changed. See Hard-to-Change entry 11.
+
+function getTransportGapNotes(tripId) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  return (trip && trip.transportGaps) || {};
+}
+
+function setTransportGapNote(tripId, key, note) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip) return;
+  trip.transportGaps = { ...(trip.transportGaps || {}), [key]: { note } };
+  // A dotted path changes just this one entry remotely, so if Dave marks
+  // a different gap at the same moment, neither change is lost.
+  remote("updateTrip", tripId, { [`transportGaps.${key}`]: { note } });
+}
+
+function clearTransportGapNote(tripId, key) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip || !trip.transportGaps) return;
+  const rest = { ...trip.transportGaps };
+  delete rest[key];
+  trip.transportGaps = rest;
+  remote("deleteTripField", tripId, `transportGaps.${key}`);
 }
 
 /* --------------------------- Packing ----------------------------- */

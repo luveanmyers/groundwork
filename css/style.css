@@ -24,11 +24,19 @@
   --tint: #C9BAB4;
   --tint-soft: #F4E9E4;
   --danger: #D65B4A;
-  /* "Your changes haven't reached the server yet" (LUV-43): the only
-     amber in the app, used only by the "Waiting to sync" status. Not as
+  /* "Your changes haven't reached the server yet" (LUV-43): the
+     amber used by the "Waiting to sync" status. Not as
      alarming as --danger, but clearly different from the calm grey
-     states. 4.9:1 contrast on --bg. */
+     states. 4.9:1 contrast on --bg. The calendar's transport warning
+     (--warning, below) shares the value. */
   --sync-waiting: #9A6314;
+  /* "Heads-up, can be dismissed" (LUV-29): the calendar's transport
+     warning. Same amber value as --sync-waiting but its own name, so
+     the two can be changed separately. Red (--danger) stays for
+     "must fix", like the No lodging stop sign. */
+  --warning: #9A6314;
+  --warning-soft: #FBF1DE;
+  --danger-soft: #FBEDEA;
   --radius: 16px;
   --radius-pill: 999px;
   --shadow-card: 0 1px 2px rgba(49, 47, 59, .06), 0 10px 24px -16px rgba(49, 47, 59, .22);
@@ -2059,6 +2067,156 @@ button.primary:active {
    dragged. */
 .cal-placed-card.lodging-bar {
   cursor: pointer;
+}
+
+/* The bottom (Lodging) row's half-day track (LUV-29). One child of
+   .cal-grid spanning all seven days, with its own 14 columns: each
+   day's morning and tonight. The 6px gap matches .cal-grid's, which
+   is what makes two halves plus the gap exactly one day wide - change
+   one and change the other, or the halves drift off the days above.
+   A stay runs from check-in evening to check-out morning; see
+   calendarNightTrackHtml() in app.js. */
+.cal-night-track {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(52px, 1fr));
+  column-gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+}
+.cal-night-track .cal-placed-card.lodging-bar {
+  border-radius: 14px;
+  min-width: 0;
+}
+.cal-night-track .cal-placed-card .placed-time-row {
+  padding-left: 0; /* lodging bars have no icon to line up under */
+}
+/* A stay or gap that carries on from last week, or into next week:
+   square that end off so it reads as continuing. */
+.cal-night-track .stay-starts-earlier {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+.cal-night-track .stay-continues {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.flag-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Red stop sign: a night with no Lodging card. Must be fixed, so it
+   can't be dismissed - it clears once a Lodging card covers the night.
+   Dashed, so it reads as "something missing", not "something placed". */
+.cal-gap-flag {
+  border: 1px dashed var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 14px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 40px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+}
+
+/* Amber warning: no dated Flight/Transport card between two stays in
+   different regions. Clickable; can be marked sorted (then grey). */
+.transport-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 1px 6px 1px 3px;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.4;
+  border: 1px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 100%;
+  align-self: flex-start;
+  overflow: hidden;
+}
+.transport-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.transport-chip:hover {
+  filter: brightness(0.96);
+}
+.transport-chip.sorted {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.transport-popover .cal-edit-popover-title .flag-icon {
+  color: var(--warning);
+}
+.transport-popover .popover-hint {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.transport-popover .popover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.transport-popover .popover-actions button {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.transport-popover .btn-primary {
+  background: var(--accent-vivid);
+  color: #fff;
+  border: 1px solid var(--accent-vivid);
+}
+.transport-popover .btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
+
+/* Short confirmation message at the bottom of the screen (showToast()
+   in app.js). First used by "+ Add a Transport card" (LUV-29). */
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.82rem;
+  padding: 10px 16px;
+  border-radius: var(--radius-pill);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.app-toast.visible {
+  opacity: 1;
 }
 
 /* A cross-day flight/transport's derived arrival echo - never a real

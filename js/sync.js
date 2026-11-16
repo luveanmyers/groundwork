@@ -32,7 +32,7 @@
 import {
   collection, doc, query, where, onSnapshot,
   setDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, arrayRemove,
-  waitForPendingWrites
+  deleteField, waitForPendingWrites
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { db } from "./firebase-init.js";
 
@@ -262,6 +262,11 @@ window.setoutSync = {
   },
   updateTrip(tripId, fields) {
     report(updateDoc(doc(db, "trips", tripId), fields), "the trip");
+  },
+  // Removes one field, or one entry of a map via a dotted path
+  // ("transportGaps.abc__def"), leaving the rest of the trip alone.
+  deleteTripField(tripId, path) {
+    report(updateDoc(doc(db, "trips", tripId), { [path]: deleteField() }), "the trip");
   },
   // Sharing (LUV-42). arrayUnion / arrayRemove add or remove one email
   // without rewriting the whole list, so if two people change the
