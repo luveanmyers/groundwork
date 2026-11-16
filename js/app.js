@@ -2143,7 +2143,35 @@ function calendarStays(scheduledIdeas) {
       const range = scheduledDateRange(idea.scheduled.date, idea.scheduled.span || 1);
       return { idea, checkIn: range[0], checkOut: range[range.length - 1] };
     })
-    .sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : a.checkOut < b.checkOut ? -1 : 1));
+    .sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : a.checkOut < b.checkOut ? -1 : 1))
+    .map(assignStayLanes());
+}
+
+// Do two stays share at least one night? Back-to-back stays (one checks
+// out the morning the other checks in) don't: they share a day, not a
+// night, and the half-day row already shows them side by side.
+function staysShareANight(a, b) {
+  return a.checkIn < b.checkOut && b.checkIn < a.checkOut;
+}
+
+// Two stays in The Itinerary on the same night would otherwise sit in
+// the same half-day columns and hide each other. Each stay gets a lane
+// (its line within the Lodging row): the first lane where it doesn't
+// share a night with anything already there. Lane 1 is the normal
+// case; a second lane only appears when something is double-booked.
+// Also records which other stays share a night with it, for the red
+// "Pick one" sign. Lanes are worked out over the whole trip, so a stay
+// keeps the same line across a week boundary. Used as a .map() callback
+// over stays sorted by check-in.
+function assignStayLanes() {
+  const lanes = []; // lanes[n] = stays already placed on line n+1
+  return (stay, i, all) => {
+    let lane = lanes.findIndex((laneStays) => !laneStays.some((other) => staysShareANight(other, stay)));
+    if (lane === -1) { lanes.push([]); lane = lanes.length - 1; }
+    lanes[lane].push(stay);
+    const overlaps = all.filter((other) => other !== stay && staysShareANight(other, stay)).map((o) => o.idea);
+    return { ...stay, lane: lane + 1, overlaps };
+  };
 }
 
 // Runs of nights with no Lodging card, as { start, end } where start
@@ -2197,6 +2225,9 @@ function transportGaps(stays, itineraryIdeas, notes) {
   for (let n = 1; n < stays.length; n++) {
     const from = stays[n - 1];
     const to = stays[n];
+    // Two stays on the same night are alternatives to pick between, not
+    // a trip from one to the other - the red "Pick one" covers that.
+    if (staysShareANight(from, to)) continue;
     if (!regionKey(from.idea) || !regionKey(to.idea)) continue;
     if (regionKey(from.idea) === regionKey(to.idea)) continue;
     const windowStart = from.checkOut < to.checkIn ? from.checkOut : to.checkIn;
@@ -2697,7 +2728,8 @@ function calendarNightTrackHtml(weekDayKeys, trip, gaps) {
     // The transport warning rides on the stay you're travelling TO,
     // on the segment where that stay begins.
     const gap = p.startsEarlier ? null : gaps.transport.find((g) => g.toIdeaId === stay.idea.id);
-    parts.push(calendarLodgingBarHtml(stay.idea, trip, p, clipClasses(p), gap ? transportChipHtml(trip, gap) : ""));
+    const chips = (stay.overlaps.length ? overlapChipHtml(stay) : "") + (gap ? transportChipHtml(trip, gap) : "");
+    parts.push(calendarLodgingBarHtml(stay, trip, p, clipClasses(p), chips));
   });
 
   gaps.lodgingRuns.forEach((run) => {
@@ -2748,13 +2780,14 @@ function flagIconHtml(id) {
 // Lodging row has always been placed automatically from the card's
 // check-in/check-out dates - but clickable to open the same edit
 // popover as every other placed card.
-function calendarLodgingBarHtml(idea, trip, place, clipClasses, chipHtml) {
+function calendarLodgingBarHtml(stay, trip, place, clipClasses, chipHtml) {
+  const idea = stay.idea;
   const times = [];
   if (!place.startsEarlier && idea.checkInTime) times.push(`In ${formatTimeShort(idea.checkInTime)}`);
   if (!place.continues && idea.checkOutTime) times.push(`Out ${formatTimeShort(idea.checkOutTime)}`);
   return `
-    <div class="cal-placed-card allday-bar lodging-bar${clipClasses}"
-         style="grid-row:1; grid-column:${place.column};"
+    <div class="cal-placed-card allday-bar lodging-bar${clipClasses}${stay.overlaps.length ? " has-overlap" : ""}"
+         style="grid-row:${stay.lane}; grid-column:${place.column};"
          data-popover-anchor="${idea.id}"
          draggable="false"
          onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}', '${idea.id}')">
@@ -2764,6 +2797,17 @@ function calendarLodgingBarHtml(idea, trip, place, clipClasses, chipHtml) {
       ${times.length ? `<div class="placed-time-row">${times.join(" &middot; ")}</div>` : ""}
       ${chipHtml}
     </div>`;
+}
+
+// Red "Pick one" on a stay that shares a night with another stay in
+// The Itinerary. Must be fixed, like "No lodging" - keep one and move
+// the other out of The Itinerary - so it's not clickable or dismissible.
+function overlapChipHtml(stay) {
+  const others = stay.overlaps.map((o) => o.title).join(", ");
+  return `
+    <span class="overlap-chip" title="${escapeHtml(`Also booked for some of the same nights: ${others}. Keep one and move the other out of The Itinerary.`)}">
+      ${flagIconHtml("i-stop")}<span>Pick one</span>
+    </span>`;
 }
 
 // The amber transport warning, or - once marked sorted - a calm grey

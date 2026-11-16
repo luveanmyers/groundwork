@@ -2080,6 +2080,7 @@ button.primary:active {
   display: grid;
   grid-template-columns: repeat(14, minmax(52px, 1fr));
   column-gap: 6px;
+  row-gap: 4px; /* between stays stacked because they share a night */
   min-width: 0;
   padding: 2px 0;
 }
@@ -2143,6 +2144,28 @@ button.primary:active {
 .cal-gap-flag .gap-sub {
   font-weight: 600;
   font-size: 0.68rem;
+}
+
+/* Two stays in The Itinerary on the same night: both show, stacked,
+   with a red border and a red "Pick one" chip. Not clickable. */
+.cal-placed-card.lodging-bar.has-overlap {
+  border-color: var(--danger);
+}
+.overlap-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 1px 6px 1px 3px;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  align-self: flex-start;
+  border: 1px dashed var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+  cursor: default;
 }
 
 /* Amber warning: no dated Flight/Transport card between two stays in
