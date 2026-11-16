@@ -355,6 +355,7 @@ function goHome() {
   currentScreen = "home";
   isMenuOpen = false;
   isShareOpen = false;
+  isEditTripOpen = false;
   isAccountOpen = false;
   render();
 }
@@ -363,6 +364,7 @@ function goToScreen(screen) {
   currentScreen = screen;
   isMenuOpen = false;
   isShareOpen = false;
+  isEditTripOpen = false;
   isAccountOpen = false;
   render();
 }
@@ -745,6 +747,7 @@ function openTrip(tripId) {
   currentTab = TRIP_START_TAB;
   currentScreen = "trip";
   isShareOpen = false;
+  isEditTripOpen = false;
   ideaFilters = defaultIdeaFilters();
   expandedIdeaIds = new Set();
   draggedIdeaId = null;
@@ -767,7 +770,7 @@ function confirmDeleteTrip(tripId) {
 function renderTripScreen(trip) {
   appRoot().innerHTML = `
     <header class="app-header">
-      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>`, shareChipHtml(trip))}
+      ${subpageHeaderHtml(`<h1 class="page-title">${escapeHtml(trip.name)}</h1><div class="muted small">${escapeHtml(trip.destination || "")} ${formatDateRange(trip.startDate, trip.endDate)}</div>`, editTripChipHtml() + shareChipHtml(trip))}
     </header>
     <main class="screen" id="tab-content"></main>
     <nav class="tab-bar">
@@ -778,6 +781,7 @@ function renderTripScreen(trip) {
       <button class="tab-btn ${currentTab === "notes" ? "active" : ""}" onclick="showTab('notes')">Notes</button>
     </nav>
     ${isShareOpen ? sharePanelHtml(trip) : ""}
+    ${isEditTripOpen ? editTripPanelHtml(trip) : ""}
   `;
   renderTabContent(trip);
 }
@@ -839,6 +843,7 @@ function sharePanelHtml(trip) {
 
 function openSharePanel() {
   isShareOpen = true;
+  isEditTripOpen = false;
   shareDraft = "";
   shareMessage = "";
   render();
@@ -874,6 +879,151 @@ function handleRemoveMember(tripId, email) {
   const ok = confirm(`Remove ${email} from ${trip ? trip.name : "this trip"}? They'll lose access to the whole trip on all their devices. You can add them back any time.`);
   if (!ok) return;
   removeTripMember(tripId, email);
+  render();
+}
+
+/* ------------------------- Editing a trip (LUV-50) ------------------------ */
+// The Edit button beside Share, and the sheet it opens: the New Trip
+// form's four fields, filled in. Uses the Share panel's slide-up sheet
+// styles. Reviewed first as mockup/edit-trip-mockup.html.
+
+// Sheet state, in memory only. The draft keeps what's been typed if the
+// screen redraws while the sheet is open (say, an edit arrives from
+// Dave), the same way shareDraft does. editTripOriginal is what each
+// field held when the sheet opened, so Save can tell which fields YOU
+// changed - see handleSaveTrip().
+let isEditTripOpen = false;
+let editTripDraft = null;
+let editTripOriginal = null;
+const EDIT_TRIP_FIELDS = ["name", "destination", "startDate", "endDate"];
+
+function pencilIconSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>`;
+}
+
+// Reuses the Share chip's look, so the two sit as a matching pair.
+function editTripChipHtml() {
+  return `<button class="share-chip" type="button" onclick="openEditTripPanel()">${pencilIconSvg()}Edit</button>`;
+}
+
+function openEditTripPanel() {
+  const trip = getActiveTrip();
+  if (!trip) return;
+  editTripDraft = {};
+  EDIT_TRIP_FIELDS.forEach((f) => { editTripDraft[f] = trip[f] || ""; });
+  editTripOriginal = { ...editTripDraft };
+  isEditTripOpen = true;
+  isShareOpen = false;
+  render();
+}
+
+function closeEditTripPanel() {
+  isEditTripOpen = false;
+  editTripDraft = null;
+  editTripOriginal = null;
+  render();
+}
+
+// What's stopping a save, or "" when nothing is. Dates are both-or-
+// neither: the calendar needs a start AND an end, and a half-dated trip
+// would look dated in the header while its Itinerary stayed empty.
+function editTripProblem(draft) {
+  if (!draft.name.trim()) return "Give the trip a name.";
+  if (!draft.startDate !== !draft.endDate) return "Add both dates, or leave both blank.";
+  if (draft.startDate && draft.endDate < draft.startDate) return "The end date is before the start date.";
+  return "";
+}
+
+// The note under the dates: which placed cards would end up outside
+// the new dates. Shown only when the dates are being changed. A note,
+// not an "are you sure?" pop-up, because nothing is lost - see
+// isPlacedOutsideTrip().
+function editTripFeedbackHtml(trip, draft) {
+  const problem = editTripProblem(draft);
+  if (problem) return `<div class="edit-notice error">${escapeHtml(problem)}</div>`;
+  const datesChanged = draft.startDate !== (trip.startDate || "") || draft.endDate !== (trip.endDate || "");
+  if (!datesChanged || !draft.startDate) return "";
+  const outside = getIdeas(trip.id)
+    .filter((i) => columnKeyForIdea(i) === "itinerary")
+    .filter((i) => isPlacedOutsideTrip(i, draft.startDate, draft.endDate));
+  if (!outside.length) return "";
+  const count = outside.length === 1 ? "1 card on the calendar falls" : `${outside.length} cards on the calendar fall`;
+  return `
+    <div class="edit-notice info">
+      ${count} outside these dates. ${outside.length === 1 ? "It'll keep its day and wait" : "They'll keep their day and wait"} under <b>Outside the trip dates</b> in Itinerary Building Blocks:
+      <ul>${outside.map((i) => `<li>${escapeHtml(i.title)} (${outsidePlacementLabel(i)})</li>`).join("")}</ul>
+    </div>`;
+}
+
+function editTripPanelHtml(trip) {
+  // If Dave changed a field while this sheet was open, show his new
+  // value in any field you haven't touched, so the sheet never shows
+  // (or saves) something older than the header behind it.
+  EDIT_TRIP_FIELDS.forEach((f) => {
+    const now = trip[f] || "";
+    if (editTripDraft[f] === editTripOriginal[f]) editTripDraft[f] = now;
+    editTripOriginal[f] = now;
+  });
+  const d = editTripDraft;
+  // Clicking the shaded area (but not the sheet itself) closes it.
+  return `
+    <div class="share-overlay" onclick="if (event.target === this) closeEditTripPanel()">
+      <div class="share-panel" role="dialog" aria-label="Edit trip">
+        <div class="share-panel-head">
+          <h2>Edit trip</h2>
+          <button class="share-close" type="button" aria-label="Close" onclick="closeEditTripPanel()">&times;</button>
+        </div>
+        <form class="form edit-panel-form" novalidate onsubmit="handleSaveTrip(event, '${trip.id}')">
+          <label>Trip name
+            <input name="name" type="text" value="${escapeHtml(d.name)}" oninput="handleEditTripInput(this)" />
+          </label>
+          <label>Destination
+            <input name="destination" type="text" value="${escapeHtml(d.destination)}" oninput="handleEditTripInput(this)" />
+          </label>
+          <div class="row">
+            <label>Start date
+              <input name="startDate" type="date" value="${escapeHtml(d.startDate)}" oninput="handleEditTripInput(this)" />
+            </label>
+            <label>End date
+              <input name="endDate" type="date" value="${escapeHtml(d.endDate)}" oninput="handleEditTripInput(this)" />
+            </label>
+          </div>
+          <div id="edit-trip-feedback">${editTripFeedbackHtml(trip, d)}</div>
+          <div class="form-actions">
+            <button type="button" onclick="closeEditTripPanel()">Cancel</button>
+            <button class="primary" type="submit" id="edit-trip-save"${editTripProblem(d) ? " disabled" : ""}>Save</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+}
+
+// Typing only refreshes the note and the Save button, not the whole
+// screen: a full redraw would rebuild the inputs and drop the cursor
+// out of the field being typed in.
+function handleEditTripInput(input) {
+  const trip = getActiveTrip();
+  if (!trip || !editTripDraft) return;
+  editTripDraft[input.name] = input.value;
+  document.getElementById("edit-trip-feedback").innerHTML = editTripFeedbackHtml(trip, editTripDraft);
+  document.getElementById("edit-trip-save").disabled = !!editTripProblem(editTripDraft);
+}
+
+function handleSaveTrip(event, tripId) {
+  event.preventDefault();
+  const d = editTripDraft;
+  if (!d || editTripProblem(d)) return;
+  // Only the fields you changed in this sheet. A field you left alone
+  // is never sent, even if it now differs from the trip (Dave may have
+  // just changed it on his phone), so his edit isn't undone by yours.
+  const changes = {};
+  EDIT_TRIP_FIELDS.forEach((f) => {
+    if (d[f] !== editTripOriginal[f]) changes[f] = f === "name" || f === "destination" ? d[f].trim() : d[f];
+  });
+  updateTripDetails(tripId, changes);
+  isEditTripOpen = false;
+  editTripDraft = null;
+  editTripOriginal = null;
   render();
 }
 
@@ -2247,7 +2397,13 @@ function transportGaps(stays, itineraryIdeas, notes) {
 
 function itineraryTabHtml(trip) {
   if (!trip.startDate || !trip.endDate) {
-    return emptyStateHtml("Add a start and end date to this trip before building its calendar.");
+    // LUV-50: a trip created without dates used to be stuck here, with
+    // no way to add them. The button opens the same Edit trip sheet.
+    return `
+      <div class="empty-state-action">
+        ${emptyStateHtml("Add a start and end date to this trip before building its calendar.")}
+        <button class="primary" type="button" onclick="openEditTripPanel()">Add dates</button>
+      </div>`;
   }
 
   // Corrects any Flight/Transport/Lodging card's placement against its
@@ -2261,7 +2417,13 @@ function itineraryTabHtml(trip) {
   syncAutoScheduledIdeas(trip.id, getIdeas(trip.id).filter((i) => columnKeyForIdea(i) === "itinerary"));
 
   const itineraryIdeas = getIdeas(trip.id).filter((i) => columnKeyForIdea(i) === "itinerary");
-  const scheduledIdeas = itineraryIdeas.filter((i) => i.scheduled && i.scheduled.date);
+  // A card placed on days that are no longer in the trip (the dates got
+  // shorter - LUV-50) keeps its placement but is drawn in the sidebar's
+  // "Outside the trip dates" group instead of on the calendar. Before
+  // this, such a card was in neither place and simply vanished.
+  const placedIdeas = itineraryIdeas.filter((i) => i.scheduled && i.scheduled.date);
+  const scheduledIdeas = placedIdeas.filter((i) => !isPlacedOutsideTrip(i, trip.startDate, trip.endDate));
+  const outsideIdeas = placedIdeas.filter((i) => isPlacedOutsideTrip(i, trip.startDate, trip.endDate));
   const unscheduledIdeas = itineraryIdeas.filter((i) => !(i.scheduled && i.scheduled.date));
 
   const weeks = calendarWeeksForTrip(trip.startDate, trip.endDate);
@@ -2301,6 +2463,10 @@ function itineraryTabHtml(trip) {
         ${unscheduledIdeas.length
           ? unscheduledIdeas.map(calendarSidebarCardHtml).join("")
           : emptyStateHtml("Nothing waiting to be scheduled.")}
+        ${outsideIdeas.length ? `
+          <div class="sidebar-outside-head">Outside the trip dates</div>
+          <div class="muted small">Still saved on their day. Drag one onto the calendar, or change the trip's dates.</div>
+          ${outsideIdeas.map(calendarOutsideCardHtml).join("")}` : ""}
       </div>
       <div class="calendar-grid-wrap">
         ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas, gaps)).join("")}
@@ -2442,6 +2608,61 @@ function calendarSidebarCardHtml(idea) {
       <div class="row-title">${escapeHtml(idea.title)}</div>
     </div>
   `;
+}
+
+/* ---- Cards outside the trip dates (LUV-50) ---- */
+// Shrinking a trip's dates never moves or deletes a placed card: it
+// keeps its day and slot, so widening the dates again puts it straight
+// back. Until then it's listed in the sidebar instead of the calendar.
+
+// Every day a placed card covers: one day for a regular slot, several
+// for All Day bars and Lodging stays (span counts days there).
+function placedDayKeys(idea) {
+  const { date, slot, span } = idea.scheduled;
+  if (slot === "allday" || slot === "lodging") return scheduledDateRange(date, span || 1);
+  return [date];
+}
+
+// True when none of a placed card's days fall inside start..end. A
+// card with even one day inside still draws on the calendar, clipped.
+// ISO date strings ("2027-07-29") sort the same as the dates they name,
+// so plain string comparison is enough here.
+function isPlacedOutsideTrip(idea, startDate, endDate) {
+  if (!idea.scheduled || !idea.scheduled.date || !startDate || !endDate) return false;
+  return !placedDayKeys(idea).some((day) => day >= startDate && day <= endDate);
+}
+
+// "Aug 8 · Morning" for a slot card, "Aug 8 - Aug 10" for a multi-day one.
+function outsidePlacementLabel(idea) {
+  const days = placedDayKeys(idea);
+  const short = (key) => parseLocalDate(key).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (days.length > 1) return `${short(days[0])} - ${short(days[days.length - 1])}`;
+  const slot = CALENDAR_SLOTS.find((s) => s.key === idea.scheduled.slot);
+  return `${short(days[0])}${slot ? ` &middot; ${slot.label}` : ""}`;
+}
+
+// Flight, Transport and Lodging cards place themselves from their own
+// dates (syncAutoScheduledIdeas), so dragging one would just snap back:
+// they aren't draggable here, and say what moves them instead.
+function calendarOutsideCardHtml(idea) {
+  if (AUTO_SCHEDULE_TYPES.includes(idea.activityType)) {
+    const from = idea.activityType === "lodging" ? "its check-in date" : "its departure date";
+    return `
+      <div class="calendar-sidebar-card outside auto">
+        <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+        <div class="row-title">${escapeHtml(idea.title)}</div>
+        <div class="outside-date">${outsidePlacementLabel(idea)} &middot; places itself from ${from}</div>
+      </div>`;
+  }
+  return `
+    <div class="calendar-sidebar-card outside"
+         draggable="true"
+         ondragstart="handleDragStart(event, '${idea.id}')"
+         ondragend="handleDragEnd(event)">
+      <span class="pill pill-activity">${activityTypeIconHtml(idea.activityType)}${escapeHtml(activityTypeLabel(idea.activityType))}</span>
+      <div class="row-title">${escapeHtml(idea.title)}</div>
+      <div class="outside-date">${outsidePlacementLabel(idea)}</div>
+    </div>`;
 }
 
 // Returns an array of weeks (Sunday-Saturday) covering the trip's full
