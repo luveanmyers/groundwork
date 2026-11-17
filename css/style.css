@@ -2316,19 +2316,22 @@ button.primary:active {
 .transport-popover .cal-edit-popover-title .flag-icon {
   color: var(--warning);
 }
-.transport-popover .popover-hint {
+.transport-popover .popover-hint,
+.location-popover .popover-hint {
   font-size: 0.78rem;
   color: var(--ink-soft);
   margin: 0 0 10px;
   line-height: 1.45;
 }
-.transport-popover .popover-actions {
+.transport-popover .popover-actions,
+.location-popover .popover-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 12px;
 }
-.transport-popover .popover-actions button {
+.transport-popover .popover-actions button,
+.location-popover .popover-actions button {
   font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
@@ -2336,15 +2339,134 @@ button.primary:active {
   border-radius: 10px;
   cursor: pointer;
 }
-.transport-popover .btn-primary {
+.transport-popover .btn-primary,
+.location-popover .btn-primary {
   background: var(--accent-vivid);
   color: #fff;
   border: 1px solid var(--accent-vivid);
 }
-.transport-popover .btn-secondary {
+.transport-popover .btn-secondary,
+.location-popover .btn-secondary {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--border);
+}
+
+/* The rename/clear popover's Clear button (LUV-51). */
+.location-popover .btn-danger {
+  background: var(--surface);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.location-popover input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* The Location row (LUV-51): a short row right under the dates for
+   planning which region you'll be in each day. Lighter than the rows
+   below it, because it's the plan, not something booked. Empty days
+   are real <button>s, so they can be reached by keyboard; the reset
+   below makes them look like the other cells. */
+.cal-cell.cal-location-cell {
+  min-height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  background: none;
+  border: 1px dashed var(--border);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.cal-location-cell .loc-add {
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.cal-location-cell:hover,
+.cal-location-cell:focus-visible {
+  border-color: var(--accent);
+}
+.cal-location-cell:hover .loc-add,
+.cal-location-cell:focus-visible .loc-add {
+  color: var(--accent);
+}
+.cal-location-cell.editing {
+  border: none;
+  cursor: default;
+}
+.cal-location-cell input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+}
+
+/* One bar per run of days with the same place, like an All Day bar. */
+.cal-location-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 2px 4px 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.cal-location-bar:hover {
+  filter: brightness(0.97);
+}
+.cal-location-bar .loc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* Carries on from last week, or into next week: square that end off. */
+.cal-location-bar.loc-starts-earlier {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+.cal-location-bar.loc-continues {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+/* A one-day bar is narrow: show - + x only on hover or keyboard focus,
+   so the place name gets the room. Phones have no hover, so there
+   they always show. */
+.cal-location-bar .placed-controls {
+  display: none;
+}
+.cal-location-bar:hover .placed-controls,
+.cal-location-bar:focus-within .placed-controls {
+  display: flex;
+}
+@media (hover: none) {
+  .cal-location-bar .placed-controls {
+    display: flex;
+  }
 }
 
 /* Short confirmation message at the bottom of the screen (showToast()

@@ -39,7 +39,7 @@ const DEVICE_KEY = "setoutDevice";
 // app.js doesn't need to know anything changed.
 function emptyState() {
   return {
-    trips: [],          // [{ id, name, destination, startDate, endDate, memberEmails, createdBy, schemaVersion, transportGaps? }]
+    trips: [],          // [{ id, name, destination, startDate, endDate, memberEmails, createdBy, schemaVersion, transportGaps?, dayLocations? }]
     activeTripId: null,  // which trip is open on THIS device (from DEVICE_KEY, not synced)
     packing: {},          // { [tripId]: [ {id, text, checked, category} ] }
     budget: {},            // { [tripId]: [ {id, description, amount, currency, category, date} ] }
@@ -287,6 +287,52 @@ function clearTransportGapNote(tripId, key) {
   delete rest[key];
   trip.transportGaps = rest;
   remote("deleteTripField", tripId, `transportGaps.${key}`);
+}
+
+/* ---------------- Day locations (LUV-51) ---------------- */
+// The Building calendar's Location row: which region you plan to be in
+// each day, set before any lodging is booked so the trip's overall
+// route can be mapped out first.
+//
+// Saved on the trip document as a map from date to place name:
+//   dayLocations: { "2027-07-06": "Edinburgh", "2027-07-07": "Edinburgh" }
+// One plain string per day. Days in a row with the same place are drawn
+// as one bar, but that's worked out on every render, never stored.
+// Keyed by date (not day 1, day 2...) so a plan stays on its date when
+// the trip's dates change. See Hard-to-Change entry 12.
+
+function getDayLocations(tripId) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  return (trip && trip.dayLocations) || {};
+}
+
+// Sets the same place on one or more days in a single write. Each day
+// is its own dotted path, so if Dave plans other days at the same
+// moment, neither change is lost.
+function setDayLocations(tripId, dates, name) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip || !dates.length) return;
+  const fields = {};
+  trip.dayLocations = { ...(trip.dayLocations || {}) };
+  dates.forEach((date) => {
+    trip.dayLocations[date] = name;
+    fields[`dayLocations.${date}`] = name;
+  });
+  remote("updateTrip", tripId, fields);
+}
+
+// Removes one or more days. One small delete per day, for the same
+// reason: it only ever touches the days you cleared.
+function clearDayLocations(tripId, dates) {
+  const trip = loadState().trips.find((t) => t.id === tripId);
+  if (!trip || !trip.dayLocations) return;
+  const rest = { ...trip.dayLocations };
+  dates.forEach((date) => {
+    if (!(date in rest)) return;
+    delete rest[date];
+    remote("deleteTripField", tripId, `dayLocations.${date}`);
+  });
+  trip.dayLocations = rest;
 }
 
 /* --------------------------- Packing ----------------------------- */
