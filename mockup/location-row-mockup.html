@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - Location row (LUV-51) v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* ---- Mockup scaffolding only ---- */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-note ul { margin: 4px 0 0; padding-left: 18px; }
+  .mockup-wrap { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; }
+  .mockup-switch { max-width: 1300px; margin: 14px auto 0; padding: 0 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 0.82rem; color: var(--ink-soft); }
+  .mockup-switch label { display: inline-flex; gap: 6px; align-items: center; }
+  .mockup-switch select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); }
+  .mockup-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 0.82rem; padding: 10px 16px; border-radius: var(--radius-pill); display: none; z-index: 60; }
+
+  /* ---- PREVIEW-ONLY: new styles, not in css/style.css yet ---- */
+
+  /* The Location row: a short row right under the dates. Lighter than
+     the activity rows below it, because it's the plan for the day, not
+     something booked. */
+  .cal-cell.cal-location-cell {
+    min-height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    background: none;
+    border: 1px dashed var(--border);
+  }
+  .cal-location-cell .loc-add {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+  .cal-location-cell:hover { border-color: var(--accent); }
+  .cal-location-cell:hover .loc-add { color: var(--accent); }
+  .cal-location-cell input {
+    width: 100%;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 4px 8px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+  }
+
+  /* One bar per run of days with the same location (worked out from the
+     per-day values, the same way All Day bars draw across days). */
+  .cal-location-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    min-height: 30px;
+    padding: 2px 4px 2px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    color: var(--ink);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .cal-location-bar:hover { filter: brightness(0.97); }
+  .cal-location-bar.loc-starts-earlier { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+  .cal-location-bar.loc-continues { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+  .cal-location-bar .loc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .cal-location-bar .loc-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .cal-location-bar .transport-chip { margin-top: 0; }
+  /* A one-day bar is narrow: show − + × only on hover or keyboard
+     focus so the place name gets the room. Phones have no hover, so
+     there they always show. */
+  .cal-location-bar .placed-controls { display: none; }
+  .cal-location-bar:hover .placed-controls,
+  .cal-location-bar:focus-within .placed-controls { display: flex; }
+  @media (hover: none) { .cal-location-bar .placed-controls { display: flex; } }
+
+  .location-popover .popover-hint { font-size: 0.78rem; color: var(--ink-soft); margin: 0 0 10px; line-height: 1.45; }
+  .location-popover input { width: 100%; box-sizing: border-box; font: inherit; font-size: 0.82rem; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
+  .location-popover .popover-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .location-popover .popover-actions button { font: inherit; font-size: 0.82rem; font-weight: 700; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+  .location-popover .btn-primary { background: var(--accent-vivid); color: #fff; border: 1px solid var(--accent-vivid); }
+  .location-popover .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+  .location-popover .btn-danger { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
+
+  .plan-list { margin-top: 8px; }
+  .plan-list code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 0.78rem; }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP v1 - review only (LUV-51). Nothing here saves. Uses the real css/style.css.</div>
+
+<div class="mockup-note">
+  <b>What's new: a Location row right under the dates.</b> It's where you plan which region you'll be in each day, before anything is booked. Try it:
+  <ul>
+    <li><b>Click an empty Location cell</b> (Fri Jul 16 or Sat Jul 17) and type. Suggestions come from regions already on your cards and locations already used on other days. Typing "glasgow" saves as "Glasgow", matching the card spelling, so the same place doesn't end up spelled two ways.</li>
+    <li><b>Days in a row with the same location join into one bar</b>, like All Day bars do. Use <b>+</b> and <b>&minus;</b> on a bar to stretch it to the next day or pull it back. <b>&times;</b> clears it.</li>
+    <li><b>Click a bar</b> to rename it or clear it. A rename changes every day in that bar.</li>
+    <li><b>Gap flags:</b> the night of Tue Jul 13 now reads <b>"Pick one: 2 options in The Plan"</b>. The two Fort William hotels in The Plan have no dates yet, but their region matches the plan for that night. Before this, only dated options counted, so it said "No lodging". The other two flag ideas from the ticket are behind the switches below so you can see them; I recommend leaving both off for now.</li>
+  </ul>
+  <div class="plan-list"><b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027. Same cards as the gap-flag mockup. Planned: Edinburgh Jul 6&ndash;8, Stirling Jul 9, Highlands Jul 10&ndash;12, Fort William Jul 13, Isle of Skye Jul 14&ndash;15, Jul 16&ndash;17 not planned yet. The Plan has two undated Lodging cards in Fort William (Ben Nevis Inn, Glen Nevis Hostel).</div>
+</div>
+
+<div class="mockup-switch">
+  <label>Row name:
+    <select id="row-name" onchange="document.querySelectorAll('.loc-row-label').forEach((el) => { el.textContent = this.value; })">
+      <option>Location</option>
+      <option>Region</option>
+      <option>Based in</option>
+      <option>Where</option>
+    </select>
+  </label>
+  <label><input type="checkbox" checked onchange="flags.b = this.checked; render()" /> B: count undated Plan hotels by region (recommended)</label>
+  <label><input type="checkbox" onchange="flags.a = this.checked; render()" /> A: transport warning when the location changes</label>
+  <label><input type="checkbox" onchange="flags.c = this.checked; render()" /> C: flag a stay whose region doesn't match</label>
+</div>
+
+<div class="mockup-wrap">
+  <div class="calendar-layout">
+    <div class="calendar-sidebar">
+      <h2>Itinerary Building Blocks</h2>
+      <div class="muted small">Cards in The Itinerary column without a day yet. Drag one onto the calendar, or drag a placed card back here to unschedule it.</div>
+      <div class="calendar-sidebar-card" draggable="true">
+        <span class="pill pill-activity">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-food"/></svg>Food &amp; Drink</span>
+        <div class="row-title">Whisky tasting</div>
+      </div>
+    </div>
+
+    <div class="calendar-grid-wrap">
+
+      <!-- ===== Week 1: Jul 4 - Jul 10 ===== -->
+      <div class="cal-week-block">
+        <div class="cal-grid" id="week-0">
+          <div class="cal-corner" style="grid-row:1; grid-column:1;"></div>
+          <div class="cal-day-header outside-trip" style="grid-row:1; grid-column:2;">Jul 4<span class="dow">Sun</span></div>
+          <div class="cal-day-header outside-trip" style="grid-row:1; grid-column:3;">Jul 5<span class="dow">Mon</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:4;">Jul 6<span class="dow">Tue</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:5;">Jul 7<span class="dow">Wed</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:6;">Jul 8<span class="dow">Thu</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:7;">Jul 9<span class="dow">Fri</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:8;">Jul 10<span class="dow">Sat</span></div>
+
+          <!-- Row 2 is new. Every row below moved down one. -->
+          <div class="cal-row-label loc-row-label" style="grid-row:2; grid-column:1;">Location</div>
+          <div class="cal-row-label" style="grid-row:3; grid-column:1;">All day</div>
+          <div class="cal-row-label" style="grid-row:4; grid-column:1;">Morning</div>
+          <div class="cal-row-label" style="grid-row:5; grid-column:1;">Midday</div>
+          <div class="cal-row-label" style="grid-row:6; grid-column:1;">Afternoon</div>
+          <div class="cal-row-label" style="grid-row:7; grid-column:1;">Evening</div>
+          <div class="cal-row-label" style="grid-row:8; grid-column:1;">Lodging</div>
+          <script>
+            // Mockup shortcut: this week's backdrop cells for rows 3-8,
+            // each explicitly placed, same as the real calendar. Row 2
+            // (Location) is drawn by render() below.
+            (function () {
+              const outside = [2, 3];
+              let html = "";
+              for (let row = 3; row <= 8; row++) for (let col = 2; col <= 8; col++)
+                html += `<div class="cal-cell${outside.includes(col) ? " outside-trip" : ""}" style="grid-row:${row}; grid-column:${col};"></div>`;
+              document.currentScript.insertAdjacentHTML("beforebegin", html);
+            })();
+          </script>
+
+          <div class="cal-placed-group" style="grid-column:5; grid-row:4;">
+            <div class="cal-placed-card" draggable="true">
+              <div class="placed-top-row"><span class="placed-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-culture"/></svg>
+                <span class="placed-title">Edinburgh Castle</span></span></div>
+            </div>
+          </div>
+          <div class="cal-placed-group" style="grid-column:8; grid-row:4;">
+            <div class="cal-placed-card" draggable="true">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Train to Inverness</span></span></div>
+              <div class="placed-time-row">9:30am</div>
+            </div>
+          </div>
+
+          <div class="cal-night-track" style="grid-row:8; grid-column:2 / span 7;">
+            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:6 / 12;" data-stay="Edinburgh flat" data-region="Edinburgh" data-nights="2027-07-06,2027-07-07,2027-07-08">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Edinburgh flat</span></span></div>
+              <div class="placed-time-row">In 3:00pm &middot; Out 10:00am</div>
+              <div class="stay-mismatch"></div>
+            </div>
+            <div class="cal-gap-flag gap-pick" style="grid-row:1; grid-column:12 / 14;" title="No lodging chosen for the night of Jul 9. Options in The Plan: Stirling B&amp;B, Linlithgow Inn. Move one into The Itinerary.">
+              <svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 options in The Plan</span></span>
+            </div>
+            <div class="cal-placed-card allday-bar lodging-bar stay-continues" style="grid-row:1; grid-column:14 / 15;" data-stay="Loch Ness B&amp;B" data-region="Highlands" data-nights="2027-07-10">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
+              <div class="placed-time-row">In 4pm</div>
+              <div class="stay-mismatch"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Week 2: Jul 11 - Jul 17 ===== -->
+      <div class="cal-week-block">
+        <div class="cal-grid" id="week-1">
+          <div class="cal-corner" style="grid-row:1; grid-column:1;"></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:2;">Jul 11<span class="dow">Sun</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:3;">Jul 12<span class="dow">Mon</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:4;">Jul 13<span class="dow">Tue</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:5;">Jul 14<span class="dow">Wed</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:6;">Jul 15<span class="dow">Thu</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:7;">Jul 16<span class="dow">Fri</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:8;">Jul 17<span class="dow">Sat</span></div>
+
+          <div class="cal-row-label loc-row-label" style="grid-row:2; grid-column:1;">Location</div>
+          <div class="cal-row-label" style="grid-row:3; grid-column:1;">All day</div>
+          <div class="cal-row-label" style="grid-row:4; grid-column:1;">Morning</div>
+          <div class="cal-row-label" style="grid-row:5; grid-column:1;">Midday</div>
+          <div class="cal-row-label" style="grid-row:6; grid-column:1;">Afternoon</div>
+          <div class="cal-row-label" style="grid-row:7; grid-column:1;">Evening</div>
+          <div class="cal-row-label" style="grid-row:8; grid-column:1;">Lodging</div>
+          <script>
+            (function () {
+              let html = "";
+              for (let row = 3; row <= 8; row++) for (let col = 2; col <= 8; col++)
+                html += `<div class="cal-cell" style="grid-row:${row}; grid-column:${col};"></div>`;
+              document.currentScript.insertAdjacentHTML("beforebegin", html);
+            })();
+          </script>
+
+          <div class="cal-placed-group allday-group" style="grid-column:3 / span 2; grid-row:3;">
+            <div class="cal-placed-card allday-bar" draggable="true">
+              <div class="placed-top-row">
+                <span class="placed-label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-land"/></svg>
+                  <span class="placed-title">Highland tour (2 days)</span></span>
+                <div class="placed-controls">
+                  <button type="button" class="shrink-btn" title="Shrink">&minus;</button>
+                  <button type="button" class="extend-btn" title="Extend">+</button>
+                  <button type="button" class="remove-btn" title="Remove from calendar">&times;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cal-placed-group" style="grid-column:2; grid-row:5;">
+            <div class="cal-placed-card" draggable="true">
+              <div class="placed-top-row"><span class="placed-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-culture"/></svg>
+                <span class="placed-title">Urquhart Castle</span></span></div>
+            </div>
+          </div>
+
+          <div class="cal-night-track" style="grid-row:8; grid-column:2 / span 7;">
+            <div class="cal-placed-card allday-bar lodging-bar stay-starts-earlier" style="grid-row:1; grid-column:1 / 6;" data-stay="Loch Ness B&amp;B" data-region="Highlands" data-nights="2027-07-11,2027-07-12">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
+              <div class="placed-time-row">Out 11:00am</div>
+              <div class="stay-mismatch"></div>
+            </div>
+            <!-- Night of Jul 13: wording depends on switch B -->
+            <div class="cal-gap-flag" id="gap-jul13" style="grid-row:1; grid-column:6 / 8;"></div>
+            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:8 / 12;" data-stay="Portree cottage" data-region="Skye" data-nights="2027-07-14,2027-07-15">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Portree cottage</span></span></div>
+              <div class="placed-time-row">In 4:00pm &middot; Out 10:00am</div>
+              <div class="transport-chip" title="Highlands to Skye: no dated Flight or Transport card yet."><svg class="flag-icon"><use href="#i-warn"/></svg><span>Transport: Highlands &rarr; Skye</span></div>
+              <div class="stay-mismatch"></div>
+            </div>
+            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:12 / 14;" data-stay="Glasgow hotel" data-region="Glasgow" data-nights="2027-07-16">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Glasgow hotel</span></span></div>
+              <div class="placed-time-row">In 3pm &middot; Out 11am</div>
+              <div class="transport-chip sorted" title="Skye to Glasgow: sorted. Rental car, drop off in Glasgow">&#10003; <span>Rental car, drop off in Glasgow</span></div>
+              <div class="stay-mismatch"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cal-edit-popover location-popover" id="loc-popover" style="display:none;">
+      <div class="cal-edit-popover-head">
+        <span class="cal-edit-popover-title"><span>&#128205;</span><span id="lp-title">Location</span></span>
+        <button type="button" class="cal-edit-popover-close" title="Close" onclick="closePopover()">&times;</button>
+      </div>
+      <p class="popover-hint" id="lp-hint"></p>
+      <label class="confirmation-info-field">
+        <span>Where you'll be</span>
+        <input type="text" id="lp-name" list="loc-suggestions" onkeydown="if (event.key === 'Enter') renameRun()" />
+      </label>
+      <div class="popover-actions">
+        <button type="button" class="btn-primary" id="lp-save" onclick="renameRun()">Save</button>
+        <button type="button" class="btn-danger" id="lp-clear" onclick="clearRun()">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<datalist id="loc-suggestions"></datalist>
+<div class="mockup-toast" id="toast"></div>
+
+<!-- Icon sprite: copied from index.html. -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-land" viewBox="0 0 24 24"><path d="M3 17.6 8.5 8.3c.3-.5 1-.5 1.3 0l2.6 4.5 1.7-2.6c.3-.5 1-.5 1.3 0l5.1 7.4"/><circle cx="16.6" cy="6.4" r="1.5"/></symbol>
+  <symbol id="i-culture" viewBox="0 0 24 24"><path d="M7.5 20V6.3H9.3V8H11.1V6.3H12.9V8H14.7V6.3H16.5V20"/><path d="M10.7 20v-2.7a1.3 1.3 0 0 1 2.6 0V20"/><path d="M12 6.3V3.9"/><path d="M12 3.9l2.3.9-2.3.9"/></symbol>
+  <symbol id="i-food" viewBox="0 0 24 24"><path d="M7.8 3.4h8.4c0 4.2-1.8 6.9-4.2 6.9S7.8 7.6 7.8 3.4Z"/><path d="M12 10.3v7.9"/><path d="M8.2 20.5h7.6"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M8 2h8l6 6v8l-6 6H8l-6-6V8z"/><rect x="6" y="10.5" width="12" height="3" rx="1" fill="#fff" stroke="none"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M10.3 3.2a2 2 0 0 1 3.4 0l8.6 15a2 2 0 0 1-1.7 3H3.4a2 2 0 0 1-1.7-3z"/><rect x="11" y="8.5" width="2" height="6.5" rx="1" fill="#fff" stroke="none"/><circle cx="12" cy="17.6" r="1.2" fill="#fff" stroke="none"/></symbol>
+</svg>
+
+<script>
+  // Mockup-only behavior. Nothing saves. The real build would keep the
+  // same per-day map on the trip (see the note to Luvean): one entry per
+  // date, so the bars below are worked out from it on every render.
+  const TRIP_START = "2027-07-06", TRIP_END = "2027-07-17";
+  const WEEKS = [
+    ["2027-07-04", "2027-07-05", "2027-07-06", "2027-07-07", "2027-07-08", "2027-07-09", "2027-07-10"],
+    ["2027-07-11", "2027-07-12", "2027-07-13", "2027-07-14", "2027-07-15", "2027-07-16", "2027-07-17"]
+  ];
+  const ALL_DAYS = WEEKS.flat();
+  const inTrip = (d) => d >= TRIP_START && d <= TRIP_END;
+
+  const dayLocations = {
+    "2027-07-06": "Edinburgh", "2027-07-07": "Edinburgh", "2027-07-08": "Edinburgh",
+    "2027-07-09": "Stirling",
+    "2027-07-10": "Highlands", "2027-07-11": "Highlands", "2027-07-12": "Highlands",
+    "2027-07-13": "Fort William",
+    "2027-07-14": "Isle of Skye", "2027-07-15": "Isle of Skye"
+  };
+  // Regions already on cards (Ideas, Plan and Itinerary).
+  const CARD_REGIONS = ["Edinburgh", "Stirling", "Highlands", "Fort William", "Skye", "Glasgow"];
+  // Dated Flight/Transport departures in The Itinerary.
+  const TRAVEL_DATES = ["2027-07-10"];
+  // Undated Lodging cards in The Plan, by region (switch B).
+  const PLAN_UNDATED = [{ title: "Ben Nevis Inn", region: "Fort William" }, { title: "Glen Nevis Hostel", region: "Fort William" }];
+
+  const flags = { a: false, b: true, c: false };
+  let editingDay = null;
+  let openRun = null;
+
+  const key = (s) => (s || "").trim().toLowerCase();
+  const shortDate = (d) => new Date(d + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // Suggestions: card regions plus locations already used, one per
+  // spelling-ignoring-case, card spelling first.
+  function suggestions() {
+    const seen = new Map();
+    [...CARD_REGIONS, ...Object.values(dayLocations)].forEach((name) => {
+      if (!seen.has(key(name))) seen.set(key(name), name);
+    });
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }
+
+  // Typing "glasgow" saves the spelling already in use.
+  function snapSpelling(typed) {
+    const match = suggestions().find((s) => key(s) === key(typed));
+    return match || typed.trim();
+  }
+
+  // Runs of consecutive trip days with the same location (whole trip).
+  function runs() {
+    const out = [];
+    ALL_DAYS.filter(inTrip).forEach((d) => {
+      const name = dayLocations[d];
+      if (!name) return;
+      const last = out[out.length - 1];
+      const prevDay = ALL_DAYS[ALL_DAYS.indexOf(d) - 1];
+      if (last && key(last.name) === key(name) && last.days[last.days.length - 1] === prevDay) last.days.push(d);
+      else out.push({ name, days: [d] });
+    });
+    return out;
+  }
+
+  // Switch A: an amber chip on a bar when the location changes from the
+  // day before and no dated Flight/Transport card is on either day.
+  function transportChipFor(run, all) {
+    if (!flags.a) return "";
+    const i = all.indexOf(run);
+    const prev = all[i - 1];
+    if (!prev) return "";
+    const prevLast = prev.days[prev.days.length - 1];
+    if (ALL_DAYS[ALL_DAYS.indexOf(prevLast) + 1] !== run.days[0]) return "";
+    if (TRAVEL_DATES.some((t) => t === prevLast || t === run.days[0])) return "";
+    return `<span class="transport-chip" title="${esc(prev.name)} to ${esc(run.name)}: no dated Flight or Transport card yet."><svg class="flag-icon"><use href="#i-warn"/></svg><span>${esc(prev.name)} &rarr; ${esc(run.name)}</span></span>`;
+  }
+
+  function render() {
+    const all = runs();
+    document.getElementById("loc-suggestions").innerHTML = suggestions().map((s) => `<option value="${esc(s)}"></option>`).join("");
+
+    WEEKS.forEach((week, w) => {
+      const grid = document.getElementById(`week-${w}`);
+      grid.querySelectorAll(".loc-render").forEach((el) => el.remove());
+      let html = "";
+      // Empty cells (or the typing box) for days with no location.
+      week.forEach((d, i) => {
+        const col = 2 + i;
+        if (!inTrip(d)) { html += `<div class="cal-cell outside-trip loc-render" style="grid-row:2; grid-column:${col};"></div>`; return; }
+        if (dayLocations[d] && editingDay !== d) return;
+        const inner = editingDay === d
+          ? `<input type="text" list="loc-suggestions" placeholder="e.g. Edinburgh" onkeydown="handleCellKey(event, '${d}')" onblur="saveCell('${d}', this.value)" />`
+          : `<span class="loc-add">+ Where?</span>`;
+        html += `<div class="cal-cell cal-location-cell loc-render" style="grid-row:2; grid-column:${col};" onclick="startEdit('${d}')" title="Plan where you'll be on ${shortDate(d)}">${inner}</div>`;
+      });
+      // One bar per run, clipped to this week.
+      all.forEach((run) => {
+        const inWeek = run.days.filter((d) => week.includes(d) && editingDay !== d);
+        if (!inWeek.length) return;
+        const startsEarlier = run.days[0] !== inWeek[0];
+        const continues = run.days[run.days.length - 1] !== inWeek[inWeek.length - 1];
+        const col = 2 + week.indexOf(inWeek[0]);
+        const lastDay = run.days[run.days.length - 1];
+        const nextDay = ALL_DAYS[ALL_DAYS.indexOf(lastDay) + 1];
+        const canExtend = nextDay && inTrip(nextDay);
+        const controls = continues ? "" : `
+          <div class="placed-controls" onclick="event.stopPropagation()">
+            <button type="button" title="Pull back one day" onclick="shrink('${run.days[0]}')" ${run.days.length < 2 ? "disabled" : ""}>&minus;</button>
+            <button type="button" title="Stretch to the next day" onclick="extend('${run.days[0]}')" ${canExtend ? "" : "disabled"}>+</button>
+            <button type="button" class="remove-btn" title="Clear" onclick="clearRunAt('${run.days[0]}')">&times;</button>
+          </div>`;
+        const range = run.days.length > 1 ? `${shortDate(run.days[0])} - ${shortDate(lastDay)}` : shortDate(run.days[0]);
+        html += `
+          <div class="cal-location-bar loc-render${startsEarlier ? " loc-starts-earlier" : ""}${continues ? " loc-continues" : ""}"
+               style="grid-row:2; grid-column:${col} / span ${inWeek.length};"
+               title="${esc(run.name)}, ${range}. Click to rename or clear."
+               onclick="openPopover(event, '${run.days[0]}')">
+            <span class="loc-left"><span class="loc-name">${esc(run.name)}</span>${startsEarlier ? "" : transportChipFor(run, all)}</span>
+            ${controls}
+          </div>`;
+      });
+      // Row 2 children go before the placed items so those keep painting on top.
+      grid.querySelector(".loc-row-label").insertAdjacentHTML("afterend", html);
+    });
+
+    if (editingDay) {
+      const input = document.querySelector(".cal-location-cell input");
+      if (input) input.focus();
+    }
+    renderFlags();
+  }
+
+  function renderFlags() {
+    // Jul 13: switch B decides whether the undated Fort William hotels count.
+    const gap = document.getElementById("gap-jul13");
+    const planned = dayLocations["2027-07-13"];
+    const options = flags.b ? PLAN_UNDATED.filter((o) => planned && key(o.region) === key(planned)) : [];
+    if (options.length) {
+      gap.className = "cal-gap-flag gap-pick";
+      gap.title = `No lodging chosen for the night of Jul 13. Options in The Plan for ${planned}: ${options.map((o) => o.title).join(", ")}. Move one into The Itinerary.`;
+      gap.innerHTML = `<svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">${options.length} ${options.length === 1 ? "option" : "options"} in The Plan</span></span>`;
+    } else {
+      gap.className = "cal-gap-flag";
+      gap.title = "No lodging booked for the night of Jul 13. Add a Lodging card to fix it.";
+      gap.innerHTML = `<svg class="flag-icon"><use href="#i-stop"/></svg><span>No lodging</span>`;
+    }
+    // Switch C: a stay whose region differs from the plan for any of its nights.
+    document.querySelectorAll(".lodging-bar[data-stay]").forEach((bar) => {
+      const slot = bar.querySelector(".stay-mismatch");
+      const nights = bar.dataset.nights.split(",");
+      const differs = nights.map((n) => dayLocations[n]).filter((p) => p && key(p) !== key(bar.dataset.region));
+      slot.innerHTML = flags.c && differs.length
+        ? `<span class="transport-chip" title="This stay is in ${esc(bar.dataset.region)}, but the plan says ${esc(differs[0])}."><svg class="flag-icon"><use href="#i-warn"/></svg><span>Plan says ${esc(differs[0])}</span></span>`
+        : "";
+    });
+  }
+
+  function startEdit(day) {
+    if (editingDay === day) return;
+    editingDay = day;
+    render();
+  }
+  function handleCellKey(event, day) {
+    if (event.key === "Enter") event.target.blur();
+    if (event.key === "Escape") { editingDay = null; render(); }
+  }
+  function saveCell(day, value) {
+    if (editingDay !== day) return;
+    editingDay = null;
+    if (value.trim()) {
+      const name = snapSpelling(value);
+      dayLocations[day] = name;
+      if (key(name) === key(value) && name !== value.trim()) toast(`Saved as "${name}", the spelling already on your cards.`);
+    }
+    render();
+  }
+
+  const runAt = (day) => runs().find((r) => r.days.includes(day));
+
+  function extend(day) {
+    const run = runAt(day);
+    const next = ALL_DAYS[ALL_DAYS.indexOf(run.days[run.days.length - 1]) + 1];
+    if (!next || !inTrip(next)) return;
+    dayLocations[next] = run.name; // takes the next day over, even if it had a different place
+    render();
+  }
+  function shrink(day) {
+    const run = runAt(day);
+    if (run.days.length < 2) return;
+    delete dayLocations[run.days[run.days.length - 1]];
+    render();
+  }
+  function clearRunAt(day) {
+    runAt(day).days.forEach((d) => delete dayLocations[d]);
+    closePopover();
+    render();
+  }
+
+  function openPopover(event, day) {
+    event.stopPropagation();
+    openRun = runAt(day);
+    const n = openRun.days.length;
+    const range = n > 1 ? `${shortDate(openRun.days[0])} - ${shortDate(openRun.days[n - 1])}` : shortDate(openRun.days[0]);
+    document.getElementById("lp-title").textContent = openRun.name;
+    document.getElementById("lp-hint").textContent = n > 1
+      ? `${range} (${n} days). Renaming changes all ${n}. To change just one day, pull the bar back with − first.`
+      : range;
+    document.getElementById("lp-name").value = openRun.name;
+    document.getElementById("lp-clear").textContent = n > 1 ? `Clear all ${n} days` : "Clear";
+    const pop = document.getElementById("loc-popover");
+    pop.style.display = "";
+    const r = event.currentTarget.getBoundingClientRect();
+    pop.style.top = (r.bottom + 8) + "px";
+    pop.style.left = Math.max(12, Math.min(r.left, window.innerWidth - 292)) + "px";
+    document.getElementById("lp-name").focus();
+  }
+  function closePopover() {
+    document.getElementById("loc-popover").style.display = "none";
+    openRun = null;
+  }
+  function renameRun() {
+    const value = document.getElementById("lp-name").value;
+    if (!value.trim()) return clearRun();
+    const name = snapSpelling(value);
+    openRun.days.forEach((d) => { dayLocations[d] = name; });
+    closePopover();
+    render();
+  }
+  function clearRun() { clearRunAt(openRun.days[0]); }
+
+  function toast(text) {
+    const t = document.getElementById("toast");
+    t.textContent = text;
+    t.style.display = "block";
+    setTimeout(() => { t.style.display = "none"; }, 3000);
+  }
+
+  document.addEventListener("click", (e) => {
+    const pop = document.getElementById("loc-popover");
+    if (openRun && !pop.contains(e.target)) closePopover();
+  });
+
+  render();
+</script>
+</body>
+</html>
