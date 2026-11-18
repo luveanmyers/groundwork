@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SetOut - Flag details on click/tap (LUV-52) v2</title>
+<title>SetOut - Flag details on click/tap (LUV-52) v3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
@@ -69,15 +69,39 @@
   .cal-gap-flag.overlap-box .overlap-head { display: flex; align-items: center; gap: 4px; }
   .cal-gap-flag.overlap-box .transport-chip { margin-top: 2px; }
 
+  /* v3: a stay on the calendar that isn't booked yet. Amber, the
+     "heads-up" colour, dashed like the other "something's missing"
+     signs, so a chosen hotel doesn't look like a done deal. */
+  .cal-placed-card.lodging-bar.not-booked { border: 1.5px dashed var(--warning); }
+  .not-booked-tag {
+    display: inline-flex; align-items: center; margin-top: 2px;
+    padding: 0 6px; border-radius: var(--radius-pill);
+    font-size: 0.68rem; font-weight: 700; line-height: 1.5;
+    background: var(--warning-soft); color: var(--warning); border: 1px solid var(--warning);
+    align-self: flex-start; white-space: nowrap;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
+  }
+  .stay-popover textarea { width: 100%; box-sizing: border-box; min-height: 56px; font: inherit; font-size: 0.82rem; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; }
+
   .legend-q { display: inline-block; background: var(--accent-soft); color: var(--ink); border-radius: 6px; padding: 0 6px; font-weight: 700; }
 </style>
 </head>
 <body>
 
-<div class="mockup-banner">MOCKUP v2 - review only (LUV-52). Nothing here saves. Uses the real css/style.css.</div>
+<div class="mockup-banner">MOCKUP v3 - review only (LUV-52). Nothing here saves. Uses the real css/style.css.</div>
 
 <div class="mockup-note" style="border-color:var(--accent);">
-  <b>v2: your feedback</b>
+  <b>v3: chosen isn't the same as booked.</b> A stay on the calendar that isn't booked yet now has a <b>yellow dashed outline and a "Not booked" tag</b>, so it doesn't pass for a done deal. Try it:
+  <ul>
+    <li><b>Loch Ness B&amp;B</b> (Jul 10&ndash;13) isn't booked. <b>Edinburgh flat</b> and <b>Portree cottage</b> are.</li>
+    <li><b>Choose</b> a hotel on Jul 9: it lands on the calendar as "Not booked".</li>
+    <li><b>Click a "Not booked" stay</b> and type a confirmation number in <b>Confirmation details</b>. Click away and the yellow goes.</li>
+  </ul>
+  A stay counts as booked when its card is marked <b>Reserved</b> on the board, <b>or</b> its Confirmation details aren't empty. Staying with friends? Type "Staying with Mia" in Confirmation details and it stops asking.
+</div>
+
+<div class="mockup-note">
+  <b>v2: your earlier feedback</b>
   <ul>
     <li><b>Buttons now act in the mockup where they can.</b> <b>Choose</b> really moves the hotel onto the calendar here (try Jul 9: the sign turns into its bar). <b>Open</b> and <b>+ Add a Lodging card</b> go to the Ideas board in the real app, which this one-page mockup can't show, so they just say what would happen. In the real app, + Add a Lodging card opens the new card on the board right away so you can type the hotel's name.</li>
     <li><b>Jul 16 is now one "Pick one" box</b> instead of two stacked stays. Click it to see both and <b>Keep this one</b> (the other goes back to The Plan). Try it: the box turns into the stay you kept.</li>
@@ -183,14 +207,14 @@
           </div>
 
           <div class="cal-night-track" style="grid-row:8; grid-column:2 / span 7;">
-            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:6 / 12;">
+            <div class="cal-placed-card allday-bar lodging-bar" data-stay="edinburgh" style="grid-row:1; grid-column:6 / 12;">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Edinburgh flat</span></span></div>
               <div class="placed-time-row">In 3:00pm &middot; Out 10:00am</div>
             </div>
             <button type="button" class="cal-gap-flag gap-pick" id="pick-jul9" style="grid-row:1; grid-column:12 / 14;" onclick="openFlag(event, 'pick-jul9')">
               <svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 options in The Plan</span></span>
             </button>
-            <div class="cal-placed-card allday-bar lodging-bar stay-continues" style="grid-row:1; grid-column:14 / 15;">
+            <div class="cal-placed-card allday-bar lodging-bar stay-continues" data-stay="lochness" style="grid-row:1; grid-column:14 / 15;">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
               <div class="placed-time-row">In 4pm</div>
             </div>
@@ -257,14 +281,14 @@
           </div>
 
           <div class="cal-night-track" style="grid-row:8; grid-column:2 / span 7;">
-            <div class="cal-placed-card allday-bar lodging-bar stay-starts-earlier" style="grid-row:1; grid-column:1 / 6;">
+            <div class="cal-placed-card allday-bar lodging-bar stay-starts-earlier" data-stay="lochness" style="grid-row:1; grid-column:1 / 6;">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
               <div class="placed-time-row">Out 11:00am</div>
             </div>
             <button type="button" class="cal-gap-flag gap-pick" style="grid-row:1; grid-column:6 / 8;" onclick="openFlag(event, 'pick-jul13')">
               <svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 options in The Plan</span></span>
             </button>
-            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:8 / 10;">
+            <div class="cal-placed-card allday-bar lodging-bar" data-stay="portree" style="grid-row:1; grid-column:8 / 10;">
               <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Portree cottage</span></span></div>
               <div class="placed-time-row">In 4pm &middot; Out 10am</div>
               <div class="transport-chip"><svg class="flag-icon"><use href="#i-warn"/></svg><span>Transport: Highlands &rarr; Skye</span></div>
@@ -342,10 +366,52 @@
     "overlap-jul16": () => head(`${stop}<span>Pick one &middot; night of Jul 16</span>`) + `
       <p class="popover-hint">Two stays in The Itinerary for the night of Fri Jul 16. Keep one; the other goes back to The Plan.</p>
       <div class="flag-options">
-        ${option("Glasgow hotel", "Jul 16 &rarr; Jul 17 &middot; In 3pm &middot; Reserved", keepBtn("Glasgow hotel", "Glasgow flat", false) + openBtn("Glasgow hotel"))}
-        ${option("Glasgow flat", "Jul 16 &rarr; Jul 17 &middot; In 4pm", keepBtn("Glasgow flat", "Glasgow hotel", true) + openBtn("Glasgow flat"))}
+        ${option("Glasgow hotel", "Jul 16 &rarr; Jul 17 &middot; In 3pm &middot; Booked", keepBtn("Glasgow hotel", "Glasgow flat", false) + openBtn("Glasgow hotel"))}
+        ${option("Glasgow flat", "Jul 16 &rarr; Jul 17 &middot; In 4pm &middot; Not booked", keepBtn("Glasgow flat", "Glasgow hotel", true) + openBtn("Glasgow flat"))}
       </div>`
   };
+  // v3: what each stay's card says about booking. Booked = marked
+  // Reserved on the board, or Confirmation details not empty.
+  const STAYS = {
+    edinburgh: { name: "Edinburgh flat", reserved: true, conf: "Airbnb HMK42Q" },
+    lochness: { name: "Loch Ness B&amp;B", reserved: false, conf: "" },
+    portree: { name: "Portree cottage", reserved: false, conf: "Booking.com 3381-207" }
+  };
+  const isBooked = (st) => st.reserved || st.conf.trim() !== "";
+  function paintStays() {
+    document.querySelectorAll("[data-stay]").forEach((bar) => {
+      const st = STAYS[bar.dataset.stay];
+      const booked = isBooked(st);
+      bar.classList.toggle("not-booked", !booked);
+      let tag = bar.querySelector(".not-booked-tag");
+      if (!booked && !tag) {
+        tag = document.createElement("span");
+        tag.className = "not-booked-tag";
+        tag.textContent = "Not booked";
+        bar.querySelector(".placed-time-row").after(tag);
+      }
+      if (booked && tag) tag.remove();
+      bar.onclick = (e) => openStay(e, bar.dataset.stay);
+    });
+  }
+  // Mockup stand-in for the stay's real edit popup: just the field
+  // that matters here.
+  function openStay(event, key) {
+    event.stopPropagation();
+    const st = STAYS[key];
+    const pop = document.getElementById("flag-popover");
+    pop.classList.add("stay-popover");
+    pop.innerHTML = head(`<span>${st.name}</span>`) + `
+      <p class="popover-hint">${isBooked(st) ? (st.reserved ? "Marked Reserved on the board." : "Booked: confirmation details are filled in.") : "Not booked yet. Once it is, add the confirmation number here and the yellow outline goes away."}</p>
+      <label class="confirmation-info-field">
+        <span>Confirmation details</span>
+        <textarea placeholder="Confirmation #, phone number, pickup instructions..." onchange="STAYS['${key}'].conf = this.value; paintStays()">${st.conf}</textarea>
+      </label>
+      <p class="popover-hint" style="margin-top:8px;">(The real popup also has the address and check-in/out fields, as today.)</p>`;
+    placePopover(event.currentTarget, pop);
+    openKey = "stay";
+  }
+
   let openKey = null;
   function openFlag(event, key) {
     event.stopPropagation(); // the chip or ⚠ sits inside a clickable card
@@ -355,7 +421,12 @@
     pop.style.display = "";
     // Same placement rule as the real calendar popovers: below the sign,
     // flipped above or nudged in when it would run off the screen.
-    const r = event.currentTarget.getBoundingClientRect();
+    pop.classList.remove("stay-popover");
+    placePopover(event.currentTarget, pop);
+  }
+  function placePopover(anchor, pop) {
+    pop.style.display = "";
+    const r = anchor.getBoundingClientRect();
     let top = r.bottom + 8, left = r.left;
     pop.style.top = top + "px"; pop.style.left = left + "px";
     requestAnimationFrame(() => {
@@ -373,22 +444,25 @@
   }
   // Swap a sign for the stay's bar, as the real calendar would on its
   // next draw.
-  function barInPlaceOf(id, name, times, extra) {
+  function barInPlaceOf(id, name, times, extra, stay) {
     const el = document.getElementById(id);
     const bar = document.createElement("div");
     bar.className = "cal-placed-card allday-bar lodging-bar";
+    if (stay) { STAYS[stay.key] = stay; bar.dataset.stay = stay.key; }
     bar.setAttribute("style", el.getAttribute("style"));
     bar.innerHTML = `<div class="placed-top-row"><span class="placed-label"><span class="placed-title">${name}</span></span></div><div class="placed-time-row">${times}</div>${extra || ""}`;
     el.replaceWith(bar);
+    paintStays();
   }
   function choose(name, times) {
-    barInPlaceOf("pick-jul9", name, times);
+    barInPlaceOf("pick-jul9", name, times, "", { key: "chosen", name, reserved: false, conf: "" });
     say(`Moved &quot;${name}&quot; into The Itinerary.`);
   }
   function keep(name, other, otherReserved) {
     if (otherReserved && !confirm(`"${other}" has an active reservation. Moving it out of The Itinerary means this reservation needs to be canceled - continue?`)) return;
     barInPlaceOf("overlap-jul16", name, name === "Glasgow hotel" ? "In 3pm &middot; Out 11am" : "In 4pm &middot; Out 10am",
-      '<div class="transport-chip sorted">&#10003; <span>Rental car, drop off in Glasgow</span></div>');
+      '<div class="transport-chip sorted">&#10003; <span>Rental car, drop off in Glasgow</span></div>',
+      { key: "glasgow", name, reserved: name === "Glasgow hotel", conf: "" });
     say(`Kept &quot;${name}&quot;. &quot;${other}&quot; is back in The Plan.`);
   }
   function say(text) {
@@ -405,6 +479,7 @@
     e.stopPropagation();
     say(`In the real app: opens the rename / clear popup for ${bar.querySelector(".loc-name").textContent}, as it does today.`);
   }));
+  paintStays();
   document.addEventListener("click", (e) => {
     if (openKey && !document.getElementById("flag-popover").contains(e.target)) closeFlag();
   });
