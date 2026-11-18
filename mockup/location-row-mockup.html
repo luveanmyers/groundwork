@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SetOut - Location row (LUV-51) v1</title>
+<title>SetOut - Location row (LUV-51) v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
@@ -102,17 +102,25 @@
 </head>
 <body>
 
-<div class="mockup-banner">MOCKUP v1 - review only (LUV-51). Nothing here saves. Uses the real css/style.css.</div>
+<div class="mockup-banner">MOCKUP v2 - review only (LUV-51). Nothing here saves. Uses the real css/style.css.</div>
+
+<div class="mockup-note" style="border-color:var(--accent);">
+  <b>v2: lining Location up with Lodging (your test finding).</b> In v1, Edinburgh covered Jul 6&ndash;8 as whole days, but the Edinburgh flat runs from check-in on the <i>evening</i> of Jul 6 to check-out on the <i>morning</i> of Jul 9 (the half-day Lodging row from LUV-29). So the two were half a day apart. Use the <b>Location bars</b> switch below to compare:
+  <ul>
+    <li><b>Half-days (recommended):</b> on a day the place changes, the morning belongs to where you woke up and the evening to where you sleep. Edinburgh now runs to the morning of Jul 9, the morning you check out, and Stirling starts that evening. The flat sits under Edinburgh exactly, apart from Jul 6's morning: that's arrival day, before check-in. What's saved doesn't change: still one place per day, meaning where you sleep that night.</li>
+    <li><b>Whole days (v1):</b> each place fills whole days. Simpler, but a stay always looks half a day off from its location.</li>
+  </ul>
+</div>
 
 <div class="mockup-note">
   <b>What's new: a Location row right under the dates.</b> It's where you plan which region you'll be in each day, before anything is booked. Try it:
   <ul>
-    <li><b>Click an empty Location cell</b> (Fri Jul 16 or Sat Jul 17) and type. Suggestions come from regions already on your cards and locations already used on other days. Typing "glasgow" saves as "Glasgow", matching the card spelling, so the same place doesn't end up spelled two ways.</li>
+    <li><b>Click an empty Location cell</b> (Sat Jul 17) and type. Suggestions come from regions already on your cards and locations already used on other days. Typing "glasgow" saves as "Glasgow", matching the card spelling, so the same place doesn't end up spelled two ways.</li>
     <li><b>Days in a row with the same location join into one bar</b>, like All Day bars do. Use <b>+</b> and <b>&minus;</b> on a bar to stretch it to the next day or pull it back. <b>&times;</b> clears it.</li>
     <li><b>Click a bar</b> to rename it or clear it. A rename changes every day in that bar.</li>
     <li><b>Gap flags:</b> the night of Tue Jul 13 now reads <b>"Pick one: 2 options in The Plan"</b>. The two Fort William hotels in The Plan have no dates yet, but their region matches the plan for that night. Before this, only dated options counted, so it said "No lodging". The other two flag ideas from the ticket are behind the switches below so you can see them; I recommend leaving both off for now.</li>
   </ul>
-  <div class="plan-list"><b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027. Same cards as the gap-flag mockup. Planned: Edinburgh Jul 6&ndash;8, Stirling Jul 9, Highlands Jul 10&ndash;12, Fort William Jul 13, Isle of Skye Jul 14&ndash;15, Jul 16&ndash;17 not planned yet. The Plan has two undated Lodging cards in Fort William (Ben Nevis Inn, Glen Nevis Hostel).</div>
+  <div class="plan-list"><b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027. Same cards as the gap-flag mockup. Planned: Edinburgh Jul 6&ndash;8, Stirling Jul 9, Highlands Jul 10&ndash;12, Fort William Jul 13, Isle of Skye Jul 14&ndash;15, Glasgow Jul 16, Jul 17 not planned yet. The Plan has two undated Lodging cards in Fort William (Ben Nevis Inn, Glen Nevis Hostel).</div>
 </div>
 
 <div class="mockup-switch">
@@ -122,6 +130,12 @@
       <option>Region</option>
       <option>Based in</option>
       <option>Where</option>
+    </select>
+  </label>
+  <label>Location bars:
+    <select onchange="flags.split = this.value === 'split'; render()">
+      <option value="split">Half-days (recommended)</option>
+      <option value="whole">Whole days (v1)</option>
     </select>
   </label>
   <label><input type="checkbox" checked onchange="flags.b = this.checked; render()" /> B: count undated Plan hotels by region (recommended)</label>
@@ -331,7 +345,8 @@
     "2027-07-09": "Stirling",
     "2027-07-10": "Highlands", "2027-07-11": "Highlands", "2027-07-12": "Highlands",
     "2027-07-13": "Fort William",
-    "2027-07-14": "Isle of Skye", "2027-07-15": "Isle of Skye"
+    "2027-07-14": "Isle of Skye", "2027-07-15": "Isle of Skye",
+    "2027-07-16": "Glasgow"
   };
   // Regions already on cards (Ideas, Plan and Itinerary).
   const CARD_REGIONS = ["Edinburgh", "Stirling", "Highlands", "Fort William", "Skye", "Glasgow"];
@@ -340,7 +355,7 @@
   // Undated Lodging cards in The Plan, by region (switch B).
   const PLAN_UNDATED = [{ title: "Ben Nevis Inn", region: "Fort William" }, { title: "Glen Nevis Hostel", region: "Fort William" }];
 
-  const flags = { a: false, b: true, c: false };
+  const flags = { a: false, b: true, c: false, split: true };
   let editingDay = null;
   let openRun = null;
 
@@ -409,8 +424,48 @@
           : `<span class="loc-add">+ Where?</span>`;
         html += `<div class="cal-cell cal-location-cell loc-render" style="grid-row:2; grid-column:${col};" onclick="startEdit('${d}')" title="Plan where you'll be on ${shortDate(d)}">${inner}</div>`;
       });
-      // One bar per run, clipped to this week.
-      all.forEach((run) => {
+      // v2 half-days: bars go on a 14-column track inside row 2, the
+      // same one the Lodging row uses. Day d's morning is column
+      // 2d+1, its evening 2d+2. A bar starts on the evening of its
+      // first day when the day before had a different place (you woke
+      // up there), and runs to the next morning when the day after has
+      // a different place (you wake up here, then move on).
+      if (flags.split) {
+        let track = "";
+        all.forEach((run, r) => {
+          const first = run.days[0], last = run.days[run.days.length - 1];
+          const prev = all[r - 1], next = all[r + 1];
+          const prevDay = ALL_DAYS[ALL_DAYS.indexOf(first) - 1];
+          const nextDay = ALL_DAYS[ALL_DAYS.indexOf(last) + 1];
+          const handoverIn = prev && prev.days[prev.days.length - 1] === prevDay;
+          const handoverOut = next && next.days[0] === nextDay;
+          const half = (day, evening) => { const i = ALL_DAYS.indexOf(day) - ALL_DAYS.indexOf(week[0]); return 2 * i + (evening ? 2 : 1); };
+          let from = half(first, handoverIn);
+          let to = handoverOut ? half(nextDay, false) : half(last, true);
+          if (to < 1 || from > 14) return;
+          const startsEarlier = from < 1, continues = to > 14;
+          from = Math.max(from, 1); to = Math.min(to, 14);
+          const controls = continues ? "" : `
+            <div class="placed-controls" onclick="event.stopPropagation()">
+              <button type="button" title="Pull back one day" onclick="shrink('${first}')" ${run.days.length < 2 ? "disabled" : ""}>&minus;</button>
+              <button type="button" title="Stretch to the next day" onclick="extend('${first}')" ${nextDay && inTrip(nextDay) ? "" : "disabled"}>+</button>
+              <button type="button" class="remove-btn" title="Clear" onclick="clearRunAt('${first}')">&times;</button>
+            </div>`;
+          track += `
+            <div class="cal-location-bar${startsEarlier ? " loc-starts-earlier" : ""}${continues ? " loc-continues" : ""}"
+                 style="grid-row:1; grid-column:${from} / ${to + 1}; pointer-events:auto;"
+                 title="${esc(run.name)}. Click to rename or clear."
+                 onclick="openPopover(event, '${first}')">
+              <span class="loc-left"><span class="loc-name">${esc(run.name)}</span>${startsEarlier ? "" : transportChipFor(run, all)}</span>
+              ${controls}
+            </div>`;
+        });
+        // The track spans the whole row, so it lets clicks fall through
+        // to the empty-day cells underneath; only the bars catch them.
+        html += `<div class="cal-night-track loc-render" style="grid-row:2; grid-column:2 / span 7; pointer-events:none; padding:0;">${track}</div>`;
+      }
+      // One bar per run, clipped to this week (v1 whole days).
+      if (!flags.split) all.forEach((run) => {
         const inWeek = run.days.filter((d) => week.includes(d) && editingDay !== d);
         if (!inWeek.length) return;
         const startsEarlier = run.days[0] !== inWeek[0];
