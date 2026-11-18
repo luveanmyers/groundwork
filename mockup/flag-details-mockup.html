@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SetOut - Flag details on click/tap (LUV-52) v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  /* ---- Mockup scaffolding only ---- */
+  .mockup-banner { background: var(--accent-vivid); color: #fff; text-align: center; font-size: 0.8rem; font-weight: 600; padding: 8px; }
+  .mockup-note { max-width: 1300px; margin: 14px auto 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; }
+  .mockup-note b { color: var(--ink); }
+  .mockup-note ul, .mockup-note ol { margin: 4px 0 0; padding-left: 18px; }
+  .mockup-wrap { max-width: 1300px; margin: 16px auto 40px; padding: 0 16px; }
+  .mockup-switch { max-width: 1300px; margin: 14px auto 0; padding: 0 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 0.82rem; color: var(--ink-soft); }
+  .mockup-switch label { display: inline-flex; gap: 6px; align-items: center; }
+  .mockup-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100vw - 32px); background: var(--ink); color: #fff; font-size: 0.82rem; padding: 10px 16px; border-radius: var(--radius-pill); display: none; z-index: 60; }
+
+  /* ---- PREVIEW-ONLY: new styles, not in css/style.css yet ---- */
+
+  /* The red signs become real buttons, so they can be clicked, tapped
+     and reached with the keyboard. These reset a <button>'s own look
+     so the sign looks exactly as it does today, plus a pointer. */
+  button.cal-gap-flag,
+  button.overlap-chip,
+  button.conflict-badge {
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  button.cal-gap-flag { font-size: 0.72rem; font-weight: 700; width: 100%; }
+  button.overlap-chip { font-size: 0.7rem; font-weight: 700; line-height: 1.4; }
+  button.cal-gap-flag:hover,
+  button.overlap-chip:hover { filter: brightness(0.96); }
+  /* The collision mark was a bare ⚠ character, too small to tap. Same
+     symbol, with a little padding around it as the tap area. */
+  button.conflict-badge {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    margin: -2px 0 -2px 0;
+    font-size: 0.8rem;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  button.conflict-badge:hover { background: var(--danger-soft); }
+
+  /* The flag popup: same box as the transport and location popups. */
+  .flag-popover .cal-edit-popover-title .flag-icon { color: var(--danger); }
+  .flag-popover .popover-hint { font-size: 0.78rem; color: var(--ink-soft); margin: 0 0 10px; line-height: 1.45; }
+  .flag-popover .popover-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .flag-popover .popover-actions button { font: inherit; font-size: 0.82rem; font-weight: 700; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+  .flag-popover .btn-primary { background: var(--accent-vivid); color: #fff; border: 1px solid var(--accent-vivid); }
+  .flag-popover .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+
+  /* One line per hotel or stay inside the popup. */
+  .flag-options { border-top: 1px solid var(--border); }
+  .flag-option { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .flag-option-text { flex: 1; min-width: 0; }
+  .flag-option-name { font-weight: 700; font-size: 0.82rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .flag-option-sub { font-size: 0.74rem; color: var(--ink-soft); }
+  .flag-option-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  .flag-option-btns button { font: inherit; font-size: 0.76rem; font-weight: 700; padding: 5px 9px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .flag-option-btns .btn-primary { background: var(--accent-vivid); color: #fff; border: 1px solid var(--accent-vivid); }
+  .flag-option-btns .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+  .flag-option-btns .btn-danger { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
+
+  /* Q2 switch: the "Choose" buttons can be hidden to compare. */
+  body.no-choose .flag-choose { display: none; }
+
+  .legend-q { display: inline-block; background: var(--accent-soft); color: var(--ink); border-radius: 6px; padding: 0 6px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP v1 - review only (LUV-52). Nothing here saves. Uses the real css/style.css.</div>
+
+<div class="mockup-note">
+  <b>What's new: click or tap any red sign to see what it means.</b> Today the details are only in the browser's hover tooltip, which is slow to appear and doesn't exist on a phone. Each sign now opens a popup like the amber transport one. Try them:
+  <ul>
+    <li><b>Fri Jul 9, "Pick one: 2 options in The Plan"</b> &mdash; both Plan hotels are dated for that night.</li>
+    <li><b>Tue Jul 13, "Pick one: 2 options in The Plan"</b> &mdash; two Fort William hotels with no dates yet, counted because the Location row says Fort William that night.</li>
+    <li><b>Thu Jul 15, "No lodging"</b> &mdash; nothing waiting in The Plan.</li>
+    <li><b>Fri Jul 16, red "Pick one" on Glasgow hotel and Glasgow flat</b> &mdash; two stays in The Itinerary on the same night.</li>
+    <li><b>Wed Jul 7 Morning, the &#9888;</b> &mdash; two things placed in the same slot.</li>
+  </ul>
+  Clicking a stay bar itself still opens its edit popup, and the amber transport chips and Location bars work as they do today.
+  <div style="margin-top:8px;"><b>Example trip:</b> Scotland, Tue Jul 6 &ndash; Sat Jul 17, 2027. Same as the Location-row mockup, except Portree cottage is now one night (Jul 14&rarr;15) so the night of Jul 15 has no bed, and the Glasgow flat is double-booked with the Glasgow hotel.</div>
+</div>
+
+<div class="mockup-switch">
+  <label><input type="checkbox" checked onchange="document.body.classList.toggle('no-choose', !this.checked)" /> <span class="legend-q">Q2</span> Show "Choose" (move a Plan hotel into The Itinerary from the popup)</label>
+</div>
+
+<div class="mockup-wrap">
+  <div class="calendar-layout">
+    <div class="calendar-sidebar">
+      <h2>Itinerary Building Blocks</h2>
+      <div class="muted small">Cards in The Itinerary column without a day yet. Drag one onto the calendar, or drag a placed card back here to unschedule it.</div>
+      <div class="calendar-sidebar-card" draggable="true">
+        <span class="pill pill-activity">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-food"/></svg>Food &amp; Drink</span>
+        <div class="row-title">Whisky tasting</div>
+      </div>
+    </div>
+
+    <div class="calendar-grid-wrap">
+
+      <!-- ===== Week 1: Jul 4 - Jul 10 ===== -->
+      <div class="cal-week-block">
+        <div class="cal-grid">
+          <div class="cal-corner" style="grid-row:1; grid-column:1;"></div>
+          <div class="cal-day-header outside-trip" style="grid-row:1; grid-column:2;">Jul 4<span class="dow">Sun</span></div>
+          <div class="cal-day-header outside-trip" style="grid-row:1; grid-column:3;">Jul 5<span class="dow">Mon</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:4;">Jul 6<span class="dow">Tue</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:5;">Jul 7<span class="dow">Wed</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:6;">Jul 8<span class="dow">Thu</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:7;">Jul 9<span class="dow">Fri</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:8;">Jul 10<span class="dow">Sat</span></div>
+
+          <div class="cal-row-label" style="grid-row:2; grid-column:1;">Location</div>
+          <div class="cal-row-label" style="grid-row:3; grid-column:1;">All day</div>
+          <div class="cal-row-label" style="grid-row:4; grid-column:1;">Morning</div>
+          <div class="cal-row-label" style="grid-row:5; grid-column:1;">Midday</div>
+          <div class="cal-row-label" style="grid-row:6; grid-column:1;">Afternoon</div>
+          <div class="cal-row-label" style="grid-row:7; grid-column:1;">Evening</div>
+          <div class="cal-row-label" style="grid-row:8; grid-column:1;">Lodging</div>
+          <div class="cal-cell outside-trip cal-location-outside" style="grid-row:2; grid-column:2;"></div>
+          <div class="cal-cell outside-trip cal-location-outside" style="grid-row:2; grid-column:3;"></div>
+          <script>
+            // Mockup shortcut: this week's backdrop cells for rows 3-8,
+            // each explicitly placed, same as the real calendar.
+            (function () {
+              const outside = [2, 3];
+              let html = "";
+              for (let row = 3; row <= 8; row++) for (let col = 2; col <= 8; col++)
+                html += `<div class="cal-cell${outside.includes(col) ? " outside-trip" : ""}" style="grid-row:${row}; grid-column:${col};"></div>`;
+              document.currentScript.insertAdjacentHTML("beforebegin", html);
+            })();
+          </script>
+
+          <div class="cal-night-track cal-location-track" style="grid-row:2; grid-column:2 / span 7;">
+            <div class="cal-location-bar" style="grid-row:1; grid-column:5 / 12;"><span class="loc-left"><span class="loc-name">Edinburgh</span></span></div>
+            <div class="cal-location-bar" style="grid-row:1; grid-column:12 / 14;"><span class="loc-left"><span class="loc-name">Stirling</span></span></div>
+            <div class="cal-location-bar loc-continues" style="grid-row:1; grid-column:14 / 15;"><span class="loc-left"><span class="loc-name">Highlands</span></span></div>
+          </div>
+
+          <!-- Two things in the same slot: the collision ⚠ (Q5). -->
+          <div class="cal-placed-group" style="grid-column:5; grid-row:4;">
+            <div class="cal-placed-card has-conflict" data-anchor="conflict-jul7" draggable="true">
+              <div class="placed-top-row"><span class="placed-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-culture"/></svg>
+                <span class="placed-title">Edinburgh Castle</span>
+                <button type="button" class="conflict-badge" aria-label="Two things in this slot" onclick="openFlag(event, 'conflict-jul7')">&#9888;</button></span></div>
+            </div>
+            <div class="cal-placed-card has-conflict" draggable="true">
+              <div class="placed-top-row"><span class="placed-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-culture"/></svg>
+                <span class="placed-title">Holyrood Palace</span>
+                <button type="button" class="conflict-badge" aria-label="Two things in this slot" onclick="openFlag(event, 'conflict-jul7')">&#9888;</button></span></div>
+            </div>
+          </div>
+          <div class="cal-placed-group" style="grid-column:8; grid-row:4;">
+            <div class="cal-placed-card" draggable="true">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Train to Inverness</span></span></div>
+              <div class="placed-time-row">9:30am</div>
+            </div>
+          </div>
+
+          <div class="cal-night-track" style="grid-row:8; grid-column:2 / span 7;">
+            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:6 / 12;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Edinburgh flat</span></span></div>
+              <div class="placed-time-row">In 3:00pm &middot; Out 10:00am</div>
+            </div>
+            <button type="button" class="cal-gap-flag gap-pick" style="grid-row:1; grid-column:12 / 14;" onclick="openFlag(event, 'pick-jul9')">
+              <svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 options in The Plan</span></span>
+            </button>
+            <div class="cal-placed-card allday-bar lodging-bar stay-continues" style="grid-row:1; grid-column:14 / 15;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
+              <div class="placed-time-row">In 4pm</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Week 2: Jul 11 - Jul 17 ===== -->
+      <div class="cal-week-block">
+        <div class="cal-grid">
+          <div class="cal-corner" style="grid-row:1; grid-column:1;"></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:2;">Jul 11<span class="dow">Sun</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:3;">Jul 12<span class="dow">Mon</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:4;">Jul 13<span class="dow">Tue</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:5;">Jul 14<span class="dow">Wed</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:6;">Jul 15<span class="dow">Thu</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:7;">Jul 16<span class="dow">Fri</span></div>
+          <div class="cal-day-header" style="grid-row:1; grid-column:8;">Jul 17<span class="dow">Sat</span></div>
+
+          <div class="cal-row-label" style="grid-row:2; grid-column:1;">Location</div>
+          <div class="cal-row-label" style="grid-row:3; grid-column:1;">All day</div>
+          <div class="cal-row-label" style="grid-row:4; grid-column:1;">Morning</div>
+          <div class="cal-row-label" style="grid-row:5; grid-column:1;">Midday</div>
+          <div class="cal-row-label" style="grid-row:6; grid-column:1;">Afternoon</div>
+          <div class="cal-row-label" style="grid-row:7; grid-column:1;">Evening</div>
+          <div class="cal-row-label" style="grid-row:8; grid-column:1;">Lodging</div>
+          <div class="cal-cell cal-location-cell" style="grid-row:2; grid-column:8;"><span class="loc-add">+ Where?</span></div>
+          <script>
+            (function () {
+              let html = "";
+              for (let row = 3; row <= 8; row++) for (let col = 2; col <= 8; col++)
+                html += `<div class="cal-cell" style="grid-row:${row}; grid-column:${col};"></div>`;
+              document.currentScript.insertAdjacentHTML("beforebegin", html);
+            })();
+          </script>
+
+          <div class="cal-night-track cal-location-track" style="grid-row:2; grid-column:2 / span 7;">
+            <div class="cal-location-bar loc-starts-earlier" style="grid-row:1; grid-column:1 / 6;"><span class="loc-left"><span class="loc-name">Highlands</span></span></div>
+            <div class="cal-location-bar" style="grid-row:1; grid-column:6 / 8;"><span class="loc-left"><span class="loc-name">Fort William</span></span></div>
+            <div class="cal-location-bar" style="grid-row:1; grid-column:8 / 12;"><span class="loc-left"><span class="loc-name">Isle of Skye</span></span></div>
+            <div class="cal-location-bar" style="grid-row:1; grid-column:12 / 13;"><span class="loc-left"><span class="loc-name">Glasgow</span></span></div>
+          </div>
+
+          <div class="cal-placed-group allday-group" style="grid-column:3 / span 2; grid-row:3;">
+            <div class="cal-placed-card allday-bar" draggable="true">
+              <div class="placed-top-row">
+                <span class="placed-label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-land"/></svg>
+                  <span class="placed-title">Highland tour (2 days)</span></span>
+                <div class="placed-controls">
+                  <button type="button" class="shrink-btn" title="Shrink">&minus;</button>
+                  <button type="button" class="extend-btn" title="Extend">+</button>
+                  <button type="button" class="remove-btn" title="Remove from calendar">&times;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cal-placed-group" style="grid-column:2; grid-row:5;">
+            <div class="cal-placed-card" draggable="true">
+              <div class="placed-top-row"><span class="placed-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-culture"/></svg>
+                <span class="placed-title">Urquhart Castle</span></span></div>
+            </div>
+          </div>
+
+          <div class="cal-night-track" style="grid-row:8; grid-column:2 / span 7;">
+            <div class="cal-placed-card allday-bar lodging-bar stay-starts-earlier" style="grid-row:1; grid-column:1 / 6;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Loch Ness B&amp;B</span></span></div>
+              <div class="placed-time-row">Out 11:00am</div>
+            </div>
+            <button type="button" class="cal-gap-flag gap-pick" style="grid-row:1; grid-column:6 / 8;" onclick="openFlag(event, 'pick-jul13')">
+              <svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 options in The Plan</span></span>
+            </button>
+            <div class="cal-placed-card allday-bar lodging-bar" style="grid-row:1; grid-column:8 / 10;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Portree cottage</span></span></div>
+              <div class="placed-time-row">In 4pm &middot; Out 10am</div>
+              <div class="transport-chip"><svg class="flag-icon"><use href="#i-warn"/></svg><span>Transport: Highlands &rarr; Skye</span></div>
+            </div>
+            <button type="button" class="cal-gap-flag" style="grid-row:1; grid-column:10 / 12;" onclick="openFlag(event, 'none-jul15')">
+              <svg class="flag-icon"><use href="#i-stop"/></svg><span>No lodging</span>
+            </button>
+            <div class="cal-placed-card allday-bar lodging-bar has-overlap" style="grid-row:1; grid-column:12 / 14;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Glasgow hotel</span></span></div>
+              <div class="placed-time-row">In 3pm &middot; Out 11am</div>
+              <button type="button" class="overlap-chip" onclick="openFlag(event, 'overlap-jul16')"><svg class="flag-icon"><use href="#i-stop"/></svg><span>Pick one</span></button>
+              <div class="transport-chip sorted">&#10003; <span>Rental car, drop off in Glasgow</span></div>
+            </div>
+            <div class="cal-placed-card allday-bar lodging-bar has-overlap" style="grid-row:2; grid-column:12 / 14;">
+              <div class="placed-top-row"><span class="placed-label"><span class="placed-title">Glasgow flat</span></span></div>
+              <div class="placed-time-row">In 4pm &middot; Out 10am</div>
+              <button type="button" class="overlap-chip" onclick="openFlag(event, 'overlap-jul16')"><svg class="flag-icon"><use href="#i-stop"/></svg><span>Pick one</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cal-edit-popover flag-popover" id="flag-popover" style="display:none;"></div>
+  </div>
+</div>
+
+<div class="mockup-toast" id="toast"></div>
+
+<!-- Icon sprite: copied from index.html. -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-land" viewBox="0 0 24 24"><path d="M3 17.6 8.5 8.3c.3-.5 1-.5 1.3 0l2.6 4.5 1.7-2.6c.3-.5 1-.5 1.3 0l5.1 7.4"/><circle cx="16.6" cy="6.4" r="1.5"/></symbol>
+  <symbol id="i-culture" viewBox="0 0 24 24"><path d="M7.5 20V6.3H9.3V8H11.1V6.3H12.9V8H14.7V6.3H16.5V20"/><path d="M10.7 20v-2.7a1.3 1.3 0 0 1 2.6 0V20"/><path d="M12 6.3V3.9"/><path d="M12 3.9l2.3.9-2.3.9"/></symbol>
+  <symbol id="i-food" viewBox="0 0 24 24"><path d="M7.8 3.4h8.4c0 4.2-1.8 6.9-4.2 6.9S7.8 7.6 7.8 3.4Z"/><path d="M12 10.3v7.9"/><path d="M8.2 20.5h7.6"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M8 2h8l6 6v8l-6 6H8l-6-6V8z"/><rect x="6" y="10.5" width="12" height="3" rx="1" fill="#fff" stroke="none"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M10.3 3.2a2 2 0 0 1 3.4 0l8.6 15a2 2 0 0 1-1.7 3H3.4a2 2 0 0 1-1.7-3z"/><rect x="11" y="8.5" width="2" height="6.5" rx="1" fill="#fff" stroke="none"/><circle cx="12" cy="17.6" r="1.2" fill="#fff" stroke="none"/></symbol>
+</svg>
+
+<script>
+  // Mockup-only behavior. Nothing saves; buttons show a message saying
+  // what the real build would do.
+  const stop = '<svg class="flag-icon"><use href="#i-stop"/></svg>';
+  const head = (title) => `
+    <div class="cal-edit-popover-head">
+      <span class="cal-edit-popover-title">${title}</span>
+      <button type="button" class="cal-edit-popover-close" title="Close" onclick="closeFlag()">&times;</button>
+    </div>`;
+  const option = (name, sub, buttons) => `
+    <div class="flag-option">
+      <div class="flag-option-text"><div class="flag-option-name">${name}</div><div class="flag-option-sub">${sub}</div></div>
+      <div class="flag-option-btns">${buttons}</div>
+    </div>`;
+  const chooseBtn = (name) => `<button type="button" class="btn-primary flag-choose" onclick="say('Moves &quot;${name}&quot; into The Itinerary. Its bar replaces the sign right away.')">Choose</button>`;
+  const openBtn = (name) => `<button type="button" class="btn-secondary" onclick="say('Switches to the Ideas board with &quot;${name}&quot; opened and scrolled into view.')">Open</button>`;
+
+  const FLAGS = {
+    // Q1: dated options in The Plan for the night.
+    "pick-jul9": () => head(`${stop}<span>Pick one &middot; night of Jul 9</span>`) + `
+      <p class="popover-hint">No bed chosen for the night of Fri Jul 9 (Stirling on the Location row). These are waiting in The Plan:</p>
+      <div class="flag-options">
+        ${option("Stirling B&amp;B", "Jul 9 &rarr; Jul 10 &middot; Stirling", chooseBtn("Stirling B&amp;B") + openBtn("Stirling B&amp;B"))}
+        ${option("Linlithgow Inn", "Jul 9 &rarr; Jul 10 &middot; Linlithgow", chooseBtn("Linlithgow Inn") + openBtn("Linlithgow Inn"))}
+      </div>`,
+    // Q3: undated options matched by region.
+    "pick-jul13": () => head(`${stop}<span>Pick one &middot; night of Jul 13</span>`) + `
+      <p class="popover-hint">No bed chosen for the night of Tue Jul 13. The Location row says Fort William, and these Fort William hotels are waiting in The Plan with no dates yet:</p>
+      <div class="flag-options">
+        ${option("Ben Nevis Inn", "No dates yet &middot; Fort William", openBtn("Ben Nevis Inn"))}
+        ${option("Glen Nevis Hostel", "No dates yet &middot; Fort William", openBtn("Glen Nevis Hostel"))}
+      </div>
+      <p class="popover-hint" style="margin-top:10px;">Add check-in and check-out dates to one to choose it.</p>`,
+    // Q4: nothing in The Plan.
+    "none-jul15": () => head(`${stop}<span>No lodging &middot; night of Jul 15</span>`) + `
+      <p class="popover-hint">Nothing booked for the night of Thu Jul 15, and nothing waiting in The Plan for it. The Location row says Isle of Skye.</p>
+      <div class="popover-actions">
+        <button type="button" class="btn-primary" onclick="say('Added &quot;Lodging: Isle of Skye&quot; to The Plan for Jul 15 &rarr; Jul 16. Add the hotel and move it into The Itinerary to clear this.')">+ Add a Lodging card</button>
+      </div>`,
+    // Q6: two stays in The Itinerary on the same night.
+    "overlap-jul16": () => head(`${stop}<span>Two stays &middot; night of Jul 16</span>`) + `
+      <p class="popover-hint">Both are in The Itinerary for the night of Fri Jul 16. Keep one and move the other back to The Plan.</p>
+      <div class="flag-options">
+        ${option("Glasgow hotel", "Jul 16 &rarr; Jul 17 &middot; Reserved", `<button type="button" class="btn-secondary" onclick="say('Glasgow hotel is reserved, so this first asks: &quot;Moving it out of The Itinerary means this reservation needs to be canceled - continue?&quot; (the same question the board asks today).')">Move to The Plan</button>`)}
+        ${option("Glasgow flat", "Jul 16 &rarr; Jul 17", `<button type="button" class="btn-secondary" onclick="say('Moves Glasgow flat back to The Plan. Glasgow hotel stays, and both red signs go away.')">Move to The Plan</button>`)}
+      </div>`,
+    // Q7: two things in the same regular slot.
+    "conflict-jul7": () => head(`<span style="color:var(--danger);">&#9888;</span><span>Two things on Jul 7, Morning</span>`) + `
+      <p class="popover-hint">Edinburgh Castle and Holyrood Palace are both in Wed Jul 7's Morning. That's fine if you meant to do both. If not, drag one to another slot or day.</p>`
+  };
+
+  let openKey = null;
+  function openFlag(event, key) {
+    event.stopPropagation(); // the chip or ⚠ sits inside a clickable card
+    openKey = key;
+    const pop = document.getElementById("flag-popover");
+    pop.innerHTML = FLAGS[key]();
+    pop.style.display = "";
+    // Same placement rule as the real calendar popovers: below the sign,
+    // flipped above or nudged in when it would run off the screen.
+    const r = event.currentTarget.getBoundingClientRect();
+    let top = r.bottom + 8, left = r.left;
+    pop.style.top = top + "px"; pop.style.left = left + "px";
+    requestAnimationFrame(() => {
+      const pr = pop.getBoundingClientRect();
+      if (pr.right > window.innerWidth - 12) left = window.innerWidth - pr.width - 12;
+      if (left < 12) left = 12;
+      if (pr.bottom > window.innerHeight - 12 && r.top - pr.height - 8 >= 8) top = r.top - pr.height - 8;
+      if (top + pr.height > window.innerHeight - 12) top = Math.max(8, window.innerHeight - 12 - pr.height);
+      pop.style.top = top + "px"; pop.style.left = left + "px";
+    });
+  }
+  function closeFlag() {
+    document.getElementById("flag-popover").style.display = "none";
+    openKey = null;
+  }
+  function say(text) {
+    closeFlag();
+    const t = document.getElementById("toast");
+    t.innerHTML = text;
+    t.style.display = "block";
+    clearTimeout(say.timer);
+    say.timer = setTimeout(() => { t.style.display = "none"; }, 4500);
+  }
+  document.addEventListener("click", (e) => {
+    if (openKey && !document.getElementById("flag-popover").contains(e.target)) closeFlag();
+  });
+</script>
+</body>
+</html>
