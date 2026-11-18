@@ -3007,28 +3007,56 @@ function calendarLocationRowHtml(week, trip, inTrip, locations) {
       </button>`);
   });
 
-  // One bar per run, clipped to this week. The + / - / x controls only
-  // go on the run's last segment, like All Day bars (the "growing edge").
-  locations.runs.forEach((run) => {
-    const segment = run.days.filter((d) => weekDayKeys.includes(d) && d !== editingLocationDay);
-    if (!segment.length) return;
+  // One bar per run, clipped to this week, drawn on a half-day track
+  // so it lines up with the Lodging row below (Luvean's call after
+  // testing v1: whole-day bars sat half a day off from their stays).
+  // Same idea as calendarNightTrackHtml(): one child of the week's
+  // grid spanning all seven days, holding 14 half-day columns - day d
+  // (0 = Sunday) has its morning at column 2d+1 and its evening at
+  // 2d+2. On a day the place changes, the morning belongs to the place
+  // you woke up in and the evening to the place you sleep, so:
+  //   - a bar starts on the EVENING of its first day when the day
+  //     before has a different place (else that morning);
+  //   - it runs to the MORNING after its last day when the day after
+  //     has a different place (else to that last evening).
+  // What's saved doesn't change: one place per day, meaning where you
+  // sleep that night. The day being typed in counts as empty here.
+  const runs = editingLocationDay
+    ? locationRuns(trip, { ...locations.byDay, [editingLocationDay]: "" })
+    : locations.runs;
+  const weekFirst = weekDayKeys[0];
+  const half = (day, evening) => 2 * daysBetweenDates(weekFirst, day) + (evening ? 2 : 1);
+  const bars = [];
+  runs.forEach((run, r) => {
     const firstDay = run.days[0];
     const lastDay = run.days[run.days.length - 1];
-    const startsEarlier = firstDay !== segment[0];
-    const continues = lastDay !== segment[segment.length - 1];
+    const prev = runs[r - 1];
+    const next = runs[r + 1];
     const nextDay = scheduledDateRange(lastDay, 2)[1];
+    const handoverIn = prev && scheduledDateRange(prev.days[prev.days.length - 1], 2)[1] === firstDay;
+    const handoverOut = next && next.days[0] === nextDay;
+    let from = half(firstDay, handoverIn);
+    let to = handoverOut ? half(nextDay, false) : half(lastDay, true);
+    if (to < 1 || from > 14) return; // none of it in this week
+    const startsEarlier = from < 1;
+    const continues = to > 14;
+    from = Math.max(from, 1);
+    to = Math.min(to, 14);
+
     const canExtend = nextDay <= trip.endDate;
     const range = run.days.length > 1 ? `${shortDateLabel(firstDay)} - ${shortDateLabel(lastDay)}` : shortDateLabel(firstDay);
-    const anchorKey = `location-${segment[0]}`;
+    const anchorKey = `location-${firstDay}-${weekFirst}`;
+    // The + / - / x controls only go on the run's last segment, like
+    // All Day bars (the "growing edge").
     const controls = continues ? "" : `
       <div class="placed-controls" onclick="event.stopPropagation()">
         <button type="button" class="shrink-btn" title="Pull back one day" onclick="handleShrinkLocationRun(event, '${trip.id}', '${firstDay}')"${run.days.length < 2 ? " disabled" : ""}>&minus;</button>
         <button type="button" class="extend-btn" title="Stretch to the next day" onclick="handleExtendLocationRun(event, '${trip.id}', '${firstDay}')"${canExtend ? "" : " disabled"}>+</button>
         <button type="button" class="remove-btn" title="Clear" onclick="handleClearLocationRun(event, '${trip.id}', '${firstDay}')">&times;</button>
       </div>`;
-    parts.push(`
+    bars.push(`
       <div class="cal-location-bar${startsEarlier ? " loc-starts-earlier" : ""}${continues ? " loc-continues" : ""}"
-           style="grid-row:${LOCATION_ROW}; grid-column:${2 + weekDayKeys.indexOf(segment[0])} / span ${segment.length};"
+           style="grid-row:1; grid-column:${from} / ${to + 1};"
            data-popover-anchor="${anchorKey}"
            title="${escapeHtml(`${run.name}, ${range}. Click to rename or clear.`)}"
            tabindex="0"
@@ -3038,6 +3066,12 @@ function calendarLocationRowHtml(week, trip, inTrip, locations) {
         ${controls}
       </div>`);
   });
+  if (bars.length) {
+    parts.push(`
+      <div class="cal-night-track cal-location-track" style="grid-row:${LOCATION_ROW}; grid-column:2 / span 7;">
+        ${bars.join("")}
+      </div>`);
+  }
 
   return parts.join("");
 }

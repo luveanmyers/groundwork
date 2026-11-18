@@ -2425,6 +2425,18 @@ button.primary:active {
   outline: none;
 }
 
+/* The Location row's bars sit on the same 14-column half-day track as
+   the Lodging row (.cal-night-track), so a place lines up with its
+   stay. The track spans the whole row on top of the empty-day cells,
+   so it lets clicks fall through to them; only the bars catch clicks. */
+.cal-night-track.cal-location-track {
+  padding: 0;
+  pointer-events: none;
+}
+.cal-location-track .cal-location-bar {
+  pointer-events: auto;
+}
+
 /* One bar per run of days with the same place, like an All Day bar. */
 .cal-location-bar {
   display: flex;
