@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SetOut - Flag details on click/tap (LUV-52) v3</title>
+<title>SetOut - Flag details on click/tap (LUV-52) v4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
@@ -88,9 +88,13 @@
 </head>
 <body>
 
-<div class="mockup-banner">MOCKUP v3 - review only (LUV-52). Nothing here saves. Uses the real css/style.css.</div>
+<div class="mockup-banner">MOCKUP v4 - review only (LUV-52). Nothing here saves. Uses the real css/style.css.</div>
 
 <div class="mockup-note" style="border-color:var(--accent);">
+  <b>v4: a booked stay settles the night.</b> If two stays in The Itinerary share a night and <b>one of them is booked</b>, there's no "Pick one" box: the calendar shows the booked one as a normal stay, and the other isn't drawn (it stays in The Itinerary column on the board, untouched). See <b>Fri Jul 16</b>: Glasgow hotel is reserved, so it just shows Glasgow hotel. Untick <b>"Glasgow hotel is booked"</b> below to see the "Pick one" box come back when neither is booked. If <b>both</b> are booked, the box still shows: that's a real double booking to cancel.
+</div>
+
+<div class="mockup-note">
   <b>v3: chosen isn't the same as booked.</b> A stay on the calendar that isn't booked yet now has a <b>yellow dashed outline and a "Not booked" tag</b>, so it doesn't pass for a done deal. Try it:
   <ul>
     <li><b>Loch Ness B&amp;B</b> (Jul 10&ndash;13) isn't booked. <b>Edinburgh flat</b> and <b>Portree cottage</b> are.</li>
@@ -123,6 +127,7 @@
 </div>
 
 <div class="mockup-switch">
+  <label><input type="checkbox" checked onchange="glasgowBooked = this.checked; renderJul16()" /> Glasgow hotel is booked</label>
   <label><input type="checkbox" checked onchange="document.body.classList.toggle('no-choose', !this.checked)" /> Show "Choose" (move a Plan hotel into The Itinerary from the popup)</label>
   <label>Location bars:
     <select onchange="document.body.dataset.locHint = this.value">
@@ -297,7 +302,7 @@
               <svg class="flag-icon"><use href="#i-stop"/></svg><span>No lodging</span>
             </button>
             <div class="cal-gap-flag gap-pick overlap-box" id="overlap-jul16" role="button" tabindex="0" style="grid-row:1; grid-column:12 / 14;" onclick="openFlag(event, 'overlap-jul16')">
-              <span class="overlap-head"><svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 stays booked</span></span></span>
+              <span class="overlap-head"><svg class="flag-icon"><use href="#i-stop"/></svg><span class="gap-lines"><span>Pick one</span><span class="gap-sub">2 stays chosen</span></span></span>
               <span class="transport-chip sorted" onclick="event.stopPropagation()">&#10003; <span>Rental car, drop off in Glasgow</span></span>
             </div>
           </div>
@@ -366,8 +371,8 @@
     "overlap-jul16": () => head(`${stop}<span>Pick one &middot; night of Jul 16</span>`) + `
       <p class="popover-hint">Two stays in The Itinerary for the night of Fri Jul 16. Keep one; the other goes back to The Plan.</p>
       <div class="flag-options">
-        ${option("Glasgow hotel", "Jul 16 &rarr; Jul 17 &middot; In 3pm &middot; Booked", keepBtn("Glasgow hotel", "Glasgow flat", false) + openBtn("Glasgow hotel"))}
-        ${option("Glasgow flat", "Jul 16 &rarr; Jul 17 &middot; In 4pm &middot; Not booked", keepBtn("Glasgow flat", "Glasgow hotel", true) + openBtn("Glasgow flat"))}
+        ${option("Glasgow hotel", "Jul 16 &rarr; Jul 17 &middot; In 3pm &middot; Not booked", keepBtn("Glasgow hotel", "Glasgow flat", false) + openBtn("Glasgow hotel"))}
+        ${option("Glasgow flat", "Jul 16 &rarr; Jul 17 &middot; In 4pm &middot; Not booked", keepBtn("Glasgow flat", "Glasgow hotel", false) + openBtn("Glasgow flat"))}
       </div>`
   };
   // v3: what each stay's card says about booking. Booked = marked
@@ -462,7 +467,7 @@
     if (otherReserved && !confirm(`"${other}" has an active reservation. Moving it out of The Itinerary means this reservation needs to be canceled - continue?`)) return;
     barInPlaceOf("overlap-jul16", name, name === "Glasgow hotel" ? "In 3pm &middot; Out 11am" : "In 4pm &middot; Out 10am",
       '<div class="transport-chip sorted">&#10003; <span>Rental car, drop off in Glasgow</span></div>',
-      { key: "glasgow", name, reserved: name === "Glasgow hotel", conf: "" });
+      { key: "glasgow", name, reserved: false, conf: "" });
     say(`Kept &quot;${name}&quot;. &quot;${other}&quot; is back in The Plan.`);
   }
   function say(text) {
@@ -479,6 +484,25 @@
     e.stopPropagation();
     say(`In the real app: opens the rename / clear popup for ${bar.querySelector(".loc-name").textContent}, as it does today.`);
   }));
+  // v4: Jul 16 depends on whether Glasgow hotel is booked. Booked: it
+  // wins the night and shows as a normal stay. Not booked: one
+  // "Pick one" box for both.
+  let glasgowBooked = true;
+  const jul16BoxHtml = document.getElementById("overlap-jul16").outerHTML;
+  function renderJul16() {
+    closeFlag();
+    const el = document.getElementById("overlap-jul16") || document.querySelector("[data-stay=glasgow]");
+    const tmp = document.createElement("div");
+    tmp.innerHTML = jul16BoxHtml;
+    const box = tmp.firstElementChild;
+    el.replaceWith(box);
+    if (glasgowBooked) {
+      barInPlaceOf("overlap-jul16", "Glasgow hotel", "In 3pm &middot; Out 11am",
+        '<div class="transport-chip sorted">&#10003; <span>Rental car, drop off in Glasgow</span></div>',
+        { key: "glasgow", name: "Glasgow hotel", reserved: true, conf: "" });
+    }
+  }
+  renderJul16();
   paintStays();
   document.addEventListener("click", (e) => {
     if (openKey && !document.getElementById("flag-popover").contains(e.target)) closeFlag();
