@@ -73,8 +73,18 @@ let openCalendarPopoverAnchorKey = null;
 // openCalendarPopoverIdeaId is ever set.
 let openTransportGapKey = null;
 
+// The calendar's Location row (LUV-51). editingLocationDay is the day
+// whose cell is showing a text box; locationDraft is what's been typed
+// in it so far, so a re-render (Dave planning another day, say) puts
+// the same text back instead of wiping it. openLocationRunDay is a day
+// inside the bar whose rename/clear popover is open; like the transport
+// popover, it shares the card popover's slot, so only one is ever set.
+let editingLocationDay = null;
+let locationDraft = "";
+let openLocationRunDay = null;
+
 function isCalendarPopoverOpen() {
-  return !!(openCalendarPopoverIdeaId || openTransportGapKey);
+  return !!(openCalendarPopoverIdeaId || openTransportGapKey || openLocationRunDay);
 }
 
 // Whether the "Add an idea" form is currently open. Same reasoning as
@@ -1048,6 +1058,16 @@ function renderTabContent(trip) {
   // no-op on every other tab / whenever nothing's open (see the early
   // return in positionCalendarPopover()).
   if (currentTab === "itinerary" && isCalendarPopoverOpen()) positionCalendarPopover();
+
+  // A fresh render replaces the Location row's text box with a new one,
+  // so put the cursor back in it (at the end of anything already typed).
+  if (currentTab === "itinerary" && editingLocationDay) {
+    const input = document.getElementById("location-input");
+    if (input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
 }
 
 /* ------------------------------ Ideas tab ------------------------------- */
@@ -2144,7 +2164,8 @@ function mapUnplottedHtml(unplotted) {
 // Grid rules (confirmed in the calendar mockup, product-decisions.md):
 // weeks start Sunday regardless of the trip's own start day, days
 // outside the trip's date range are grayed out and non-interactive,
-// each day has an All Day row, four regular slots, and a Lodging row.
+// each day has a Location row (LUV-51), an All Day row, four regular
+// slots, and a Lodging row.
 
 const CALENDAR_SLOTS = [
   { key: "allday", label: "All day" },
@@ -2161,7 +2182,13 @@ const CALENDAR_SLOTS = [
 // inline grid-row instead of being nested inside one specific cell div
 // - that's what lets an item's box actually stretch across several
 // rows/columns for extend/shrink instead of being trapped in one cell.
-const CALENDAR_SLOT_ROWS = { allday: 2, morning: 3, midday: 4, afternoon: 5, evening: 6, lodging: 7 };
+//
+// Row 2 is the Location row (LUV-51), which isn't a slot - nothing is
+// ever scheduled into it - so it has its own constant. Adding it moved
+// every slot down one; the slot strings themselves didn't change, so
+// no saved placement moved (Hard-to-Change entries 8 and 12).
+const LOCATION_ROW = 2;
+const CALENDAR_SLOT_ROWS = { allday: 3, morning: 4, midday: 5, afternoon: 6, evening: 7, lodging: 8 };
 
 // Only these four slots support the "stretch across contiguous slots
 // in one day" extend/shrink mechanic - All Day stretches across DAYS
@@ -2435,6 +2462,19 @@ function planLodgingOptions(tripId) {
   );
 }
 
+// Lodging cards in The Plan WITHOUT a usable date range (LUV-51). They
+// can't be matched to a night by date, but they can by region: if the
+// Location row says you'll be in Fort William that night and a Fort
+// William hotel is waiting in The Plan, it counts as an option. A
+// region spelled differently just isn't counted - the sign falls back
+// to "No lodging", which is what it said before.
+function planUndatedLodgingOptions(tripId) {
+  return getIdeas(tripId).filter(
+    (i) => i.activityType === "lodging" && columnKeyForIdea(i) === "plan" &&
+      !(i.checkInDate && i.checkOutDate && i.checkInDate < i.checkOutDate)
+  );
+}
+
 // Amber transport warnings, one per pair of back-to-back stays whose
 // regions differ (ignoring capitals and stray spaces). A stay with no
 // region can't be compared, so it never triggers one. Cleared by any
@@ -2507,12 +2547,22 @@ function itineraryTabHtml(trip) {
   // Gap flags (LUV-29) - worked out once here, then each week draws
   // whatever part of them falls inside it.
   const stays = calendarStays(scheduledIdeas);
+  const dayLocations = getDayLocations(trip.id);
   const gaps = {
     stays,
     lodgingRuns: lodgingGapRuns(trip, stays),
     planLodging: planLodgingOptions(trip.id),
+    planUndatedLodging: planUndatedLodgingOptions(trip.id),
+    dayLocations,
     transport: transportGaps(stays, itineraryIdeas, getTransportGapNotes(trip.id))
   };
+
+  // The Location row (LUV-51): the per-day plan, drawn as one bar per
+  // run of days in a row with the same place.
+  const locations = { byDay: dayLocations, runs: locationRuns(trip, dayLocations) };
+  const openLocationRun = openLocationRunDay
+    ? locations.runs.find((run) => run.days.includes(openLocationRunDay))
+    : null;
 
   // The click-to-edit popover is rendered as a sibling of the grid,
   // not nested inside whichever cell its card sits in - a grid cell
@@ -2545,10 +2595,14 @@ function itineraryTabHtml(trip) {
           ${outsideIdeas.map(calendarOutsideCardHtml).join("")}` : ""}
       </div>
       <div class="calendar-grid-wrap">
-        ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas, gaps)).join("")}
+        ${weeks.map((week) => calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas, gaps, locations)).join("")}
       </div>
       ${openPopoverIdea ? calendarEditPopoverHtml(trip, openPopoverIdea) : ""}
       ${openTransportGap ? transportGapPopoverHtml(trip, openTransportGap) : ""}
+      ${openLocationRun ? locationPopoverHtml(trip, openLocationRun) : ""}
+      <datalist id="location-suggestions">
+        ${locationSuggestions(trip.id, dayLocations).map((name) => `<option value="${escapeHtml(name)}"></option>`).join("")}
+      </datalist>
     </div>
   `;
 }
@@ -2600,6 +2654,7 @@ function handleOpenCalendarPopover(event, tripId, ideaId, anchorKey) {
   openCalendarPopoverIdeaId = ideaId;
   openCalendarPopoverAnchorKey = anchorKey;
   openTransportGapKey = null;
+  openLocationRunDay = null;
   renderTabContent(getActiveTrip());
 }
 
@@ -2607,6 +2662,7 @@ function handleCloseCalendarPopover() {
   openCalendarPopoverIdeaId = null;
   openCalendarPopoverAnchorKey = null;
   openTransportGapKey = null;
+  openLocationRunDay = null;
   renderTabContent(getActiveTrip());
 }
 
@@ -2632,7 +2688,7 @@ function positionCalendarPopover() {
   const anchor = document.querySelector(`[data-popover-anchor="${openCalendarPopoverAnchorKey}"]`);
   // No anchor means whatever it was attached to is gone (e.g. Dave
   // added the Transport card that cleared a warning) - close quietly.
-  if (!anchor) { openCalendarPopoverIdeaId = null; openCalendarPopoverAnchorKey = null; openTransportGapKey = null; return; }
+  if (!anchor) { openCalendarPopoverIdeaId = null; openCalendarPopoverAnchorKey = null; openTransportGapKey = null; openLocationRunDay = null; return; }
 
   const r = anchor.getBoundingClientRect();
   let top = r.bottom + 8;
@@ -2793,7 +2849,7 @@ function scheduledDateRange(startDateKey, spanDays) {
   return days;
 }
 
-function calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas, gaps) {
+function calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas, gaps, locations) {
   const tripStart = parseLocalDate(trip.startDate);
   const tripEnd = parseLocalDate(trip.endDate);
   const inTrip = (date) => date >= tripStart && date <= tripEnd;
@@ -2847,11 +2903,317 @@ function calendarWeekBlockHtml(week, trip, scheduledIdeas, itineraryIdeas, gaps)
       <div class="cal-grid">
         <div class="cal-corner" style="grid-row:1; grid-column:1;"></div>
         ${headerCells}
+        ${calendarLocationRowHtml(week, trip, inTrip, locations)}
         ${backdropRows}
         ${placedHtml}
       </div>
     </div>
   `;
+}
+
+/* ---- Location row (LUV-51) ---- */
+// A row right under the dates for planning which region you'll be in
+// each day, before any lodging is booked: Luvean's ask, so she can map
+// out the trip's overall flow first and book lodging to match. Saved
+// as one place name per date (getDayLocations() in storage.js); days in
+// a row with the same place are drawn as one bar, with the same + / -
+// / x controls All Day bars use.
+
+// Place names are typed freely, so "Glasgow" and " glasgow" have to
+// count as the same place wherever two are compared.
+function locationKey(name) {
+  return (name || "").trim().toLowerCase();
+}
+
+// Runs of trip days in a row with the same place, as { name, days }
+// in date order, over the whole trip (so a run keeps going across a
+// week boundary, like an All Day bar). Days outside the trip's dates
+// are skipped: their saved place stays, it just isn't shown.
+function locationRuns(trip, dayLocations) {
+  const days = scheduledDateRange(trip.startDate, daysBetweenDates(trip.startDate, trip.endDate) + 1);
+  const runs = [];
+  days.forEach((day, i) => {
+    const name = dayLocations[day];
+    if (!name) return;
+    const last = runs[runs.length - 1];
+    if (last && last.days[last.days.length - 1] === days[i - 1] && locationKey(last.name) === locationKey(name)) {
+      last.days.push(day);
+    } else {
+      runs.push({ name, days: [day] });
+    }
+  });
+  return runs;
+}
+
+// What the text box suggests: every region already on this trip's
+// cards plus every place already planned, one per spelling-ignoring-
+// case. When the same place is spelled two ways ("Fort William" on
+// one card, "fort william" on another), the spelling used most wins,
+// and on a tie a card's spelling beats a planned day's.
+function locationSuggestions(tripId, dayLocations) {
+  const spellings = new Map(); // key -> Map(spelling -> times used)
+  [...getIdeas(tripId).map((i) => i.region), ...Object.values(dayLocations)].forEach((name) => {
+    const k = locationKey(name);
+    if (!k) return;
+    if (!spellings.has(k)) spellings.set(k, new Map());
+    const counts = spellings.get(k);
+    counts.set(name.trim(), (counts.get(name.trim()) || 0) + 1);
+  });
+  return [...spellings.values()]
+    .map((counts) => [...counts.entries()].reduce((best, entry) => (entry[1] > best[1] ? entry : best))[0])
+    .sort((a, b) => a.localeCompare(b));
+}
+
+// Typing "glasgow" saves "Glasgow" when that spelling is already in
+// use, so one place doesn't end up spelled two ways - which matters
+// because the "Pick one" sign matches Plan hotels to days by name.
+function snapLocationSpelling(tripId, typed) {
+  const match = locationSuggestions(tripId, getDayLocations(tripId)).find((s) => locationKey(s) === locationKey(typed));
+  return match || typed.trim();
+}
+
+function calendarLocationRowHtml(week, trip, inTrip, locations) {
+  const weekDayKeys = week.map(isoDateKey);
+  const parts = [`<div class="cal-row-label" style="grid-row:${LOCATION_ROW}; grid-column:1;">Location</div>`];
+
+  // A cell for each day with no place yet (or the text box, for the one
+  // being typed in). Days that have a place get a bar instead, below.
+  week.forEach((date, i) => {
+    const col = 2 + i;
+    const day = weekDayKeys[i];
+    const pos = `grid-row:${LOCATION_ROW}; grid-column:${col};`;
+    if (!inTrip(date)) {
+      parts.push(`<div class="cal-cell outside-trip cal-location-outside" style="${pos}"></div>`);
+      return;
+    }
+    if (editingLocationDay === day) {
+      parts.push(`
+        <div class="cal-cell cal-location-cell editing" style="${pos}">
+          <input type="text" id="location-input" list="location-suggestions" placeholder="e.g. Edinburgh"
+                 aria-label="Where you'll be on ${shortDateLabel(day)}"
+                 value="${escapeHtml(locationDraft)}"
+                 oninput="locationDraft = this.value"
+                 onkeydown="handleLocationInputKey(event, '${trip.id}', '${day}')"
+                 onblur="handleLocationInputBlur(event, '${trip.id}', '${day}')" />
+        </div>`);
+      return;
+    }
+    if (locations.byDay[day]) return;
+    parts.push(`
+      <button type="button" class="cal-cell cal-location-cell" style="${pos}"
+              title="Plan where you'll be on ${shortDateLabel(day)}"
+              onclick="handleStartLocationEdit(event, '${day}')">
+        <span class="loc-add">+ Where?</span>
+      </button>`);
+  });
+
+  // One bar per run, clipped to this week, drawn on a half-day track
+  // so it lines up with the Lodging row below (Luvean's call after
+  // testing v1: whole-day bars sat half a day off from their stays).
+  // Same idea as calendarNightTrackHtml(): one child of the week's
+  // grid spanning all seven days, holding 14 half-day columns - day d
+  // (0 = Sunday) has its morning at column 2d+1 and its evening at
+  // 2d+2. On a day the place changes, the morning belongs to the place
+  // you woke up in and the evening to the place you sleep, so:
+  //   - a bar starts on the EVENING of its first day when the day
+  //     before has a different place (else that morning);
+  //   - it runs to the MORNING after its last day when the day after
+  //     has a different place (else to that last evening).
+  // What's saved doesn't change: one place per day, meaning where you
+  // sleep that night. The day being typed in counts as empty here.
+  const runs = editingLocationDay
+    ? locationRuns(trip, { ...locations.byDay, [editingLocationDay]: "" })
+    : locations.runs;
+  const weekFirst = weekDayKeys[0];
+  const half = (day, evening) => 2 * daysBetweenDates(weekFirst, day) + (evening ? 2 : 1);
+  const bars = [];
+  runs.forEach((run, r) => {
+    const firstDay = run.days[0];
+    const lastDay = run.days[run.days.length - 1];
+    const prev = runs[r - 1];
+    const next = runs[r + 1];
+    const nextDay = scheduledDateRange(lastDay, 2)[1];
+    const handoverIn = prev && scheduledDateRange(prev.days[prev.days.length - 1], 2)[1] === firstDay;
+    const handoverOut = next && next.days[0] === nextDay;
+    let from = half(firstDay, handoverIn);
+    let to = handoverOut ? half(nextDay, false) : half(lastDay, true);
+    if (to < 1 || from > 14) return; // none of it in this week
+    const startsEarlier = from < 1;
+    const continues = to > 14;
+    from = Math.max(from, 1);
+    to = Math.min(to, 14);
+
+    const canExtend = nextDay <= trip.endDate;
+    const range = run.days.length > 1 ? `${shortDateLabel(firstDay)} - ${shortDateLabel(lastDay)}` : shortDateLabel(firstDay);
+    const anchorKey = `location-${firstDay}-${weekFirst}`;
+    // The + / - / x controls only go on the run's last segment, like
+    // All Day bars (the "growing edge").
+    const controls = continues ? "" : `
+      <div class="placed-controls" onclick="event.stopPropagation()">
+        <button type="button" class="shrink-btn" title="Pull back one day" onclick="handleShrinkLocationRun(event, '${trip.id}', '${firstDay}')"${run.days.length < 2 ? " disabled" : ""}>&minus;</button>
+        <button type="button" class="extend-btn" title="Stretch to the next day" onclick="handleExtendLocationRun(event, '${trip.id}', '${firstDay}')"${canExtend ? "" : " disabled"}>+</button>
+        <button type="button" class="remove-btn" title="Clear" onclick="handleClearLocationRun(event, '${trip.id}', '${firstDay}')">&times;</button>
+      </div>`;
+    bars.push(`
+      <div class="cal-location-bar${startsEarlier ? " loc-starts-earlier" : ""}${continues ? " loc-continues" : ""}"
+           style="grid-row:1; grid-column:${from} / ${to + 1};"
+           data-popover-anchor="${anchorKey}"
+           title="${escapeHtml(`${run.name}, ${range}. Click to rename or clear.`)}"
+           tabindex="0"
+           onclick="handleOpenLocationRun(event, '${firstDay}', '${anchorKey}')"
+           onkeydown="if (event.key === 'Enter' && event.target === this) handleOpenLocationRun(event, '${firstDay}', '${anchorKey}')">
+        <span class="loc-name">${escapeHtml(run.name)}</span>
+        ${controls}
+      </div>`);
+  });
+  if (bars.length) {
+    parts.push(`
+      <div class="cal-night-track cal-location-track" style="grid-row:${LOCATION_ROW}; grid-column:2 / span 7;">
+        ${bars.join("")}
+      </div>`);
+  }
+
+  return parts.join("");
+}
+
+// The run that includes `day`, worked out fresh from what's saved now.
+function locationRunAt(trip, day) {
+  return locationRuns(trip, getDayLocations(trip.id)).find((run) => run.days.includes(day)) || null;
+}
+
+function handleStartLocationEdit(event, day) {
+  // Stopped here so the click-outside handler doesn't also run; any
+  // open popover is closed by hand instead.
+  event.stopPropagation();
+  openCalendarPopoverIdeaId = null;
+  openCalendarPopoverAnchorKey = null;
+  openTransportGapKey = null;
+  openLocationRunDay = null;
+  editingLocationDay = day;
+  locationDraft = "";
+  renderTabContent(getActiveTrip());
+}
+
+function handleLocationInputKey(event, tripId, day) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    saveLocationEdit(tripId, day, event.target.value);
+  } else if (event.key === "Escape") {
+    editingLocationDay = null;
+    locationDraft = "";
+    renderTabContent(getActiveTrip());
+  }
+}
+
+// Clicking or tabbing away saves too. But a re-render (Dave planning
+// another day, say) also swaps the box for a new one, and the browser
+// fires blur on the old one as it goes - which, caught in testing,
+// saved half-typed text. So wait a moment and only save if the cursor
+// really left: after a re-render, renderTabContent() has already put
+// it back in the new box.
+function handleLocationInputBlur(event, tripId, day) {
+  setTimeout(() => {
+    if (editingLocationDay !== day) return; // already saved or cancelled
+    const active = document.activeElement;
+    if (active && active.id === "location-input") return;
+    saveLocationEdit(tripId, day, locationDraft);
+  }, 0);
+}
+
+function saveLocationEdit(tripId, day, value) {
+  editingLocationDay = null;
+  locationDraft = "";
+  const typed = value.trim();
+  if (typed) {
+    const name = snapLocationSpelling(tripId, typed);
+    setDayLocations(tripId, [day], name);
+    if (name !== typed) showToast(`Saved as "${name}", the spelling already on this trip.`);
+  }
+  renderTabContent(getActiveTrip());
+}
+
+// + takes the next day, even if it had a different place: that's how
+// you move the line between two places.
+function handleExtendLocationRun(event, tripId, day) {
+  event.stopPropagation();
+  const trip = getActiveTrip();
+  const run = locationRunAt(trip, day);
+  if (!run) return;
+  const nextDay = scheduledDateRange(run.days[run.days.length - 1], 2)[1];
+  if (nextDay > trip.endDate) return;
+  setDayLocations(tripId, [nextDay], run.name);
+  renderTabContent(trip);
+}
+
+function handleShrinkLocationRun(event, tripId, day) {
+  event.stopPropagation();
+  const trip = getActiveTrip();
+  const run = locationRunAt(trip, day);
+  if (!run || run.days.length < 2) return;
+  clearDayLocations(tripId, [run.days[run.days.length - 1]]);
+  renderTabContent(trip);
+}
+
+function handleClearLocationRun(event, tripId, day) {
+  event.stopPropagation();
+  const trip = getActiveTrip();
+  const run = locationRunAt(trip, day);
+  if (run) clearDayLocations(tripId, run.days);
+  openLocationRunDay = null;
+  renderTabContent(trip);
+}
+
+function handleOpenLocationRun(event, day, anchorKey) {
+  event.stopPropagation();
+  openCalendarPopoverIdeaId = null;
+  openTransportGapKey = null;
+  openLocationRunDay = day;
+  openCalendarPopoverAnchorKey = anchorKey;
+  renderTabContent(getActiveTrip());
+  const input = document.getElementById("location-popover-name");
+  if (input) input.focus();
+}
+
+// Rename or clear a whole bar. Shares the card popover's id
+// (#cal-edit-popover) for the same reason the transport one does: one
+// slot on screen, one positioning and click-outside-to-close path.
+function locationPopoverHtml(trip, run) {
+  const n = run.days.length;
+  const first = run.days[0];
+  const range = n > 1 ? `${shortDateLabel(first)} - ${shortDateLabel(run.days[n - 1])}` : shortDateLabel(first);
+  const hint = n > 1
+    ? `${range} (${n} days). Renaming changes all ${n}. To change just one day, pull the bar back with &minus; first.`
+    : range;
+  return `
+    <div class="cal-edit-popover location-popover" id="cal-edit-popover">
+      <div class="cal-edit-popover-head">
+        <span class="cal-edit-popover-title">${escapeHtml(run.name)}</span>
+        <button type="button" class="cal-edit-popover-close" title="Close" onclick="handleCloseCalendarPopover()">&times;</button>
+      </div>
+      <p class="popover-hint">${hint}</p>
+      <label class="confirmation-info-field">
+        <span>Where you'll be</span>
+        <input type="text" id="location-popover-name" list="location-suggestions" value="${escapeHtml(run.name)}"
+               onkeydown="if (event.key === 'Enter') handleRenameLocationRun('${trip.id}', '${first}')" />
+      </label>
+      <div class="popover-actions">
+        <button type="button" class="btn-primary" onclick="handleRenameLocationRun('${trip.id}', '${first}')">Save</button>
+        <button type="button" class="btn-danger" onclick="handleClearLocationRun(event, '${trip.id}', '${first}')">${n > 1 ? `Clear all ${n} days` : "Clear"}</button>
+      </div>
+    </div>`;
+}
+
+// An empty name clears the bar, the same as Clear.
+function handleRenameLocationRun(tripId, day) {
+  const trip = getActiveTrip();
+  const run = locationRunAt(trip, day);
+  const field = document.getElementById("location-popover-name");
+  const typed = field ? field.value.trim() : "";
+  if (run) {
+    if (typed) setDayLocations(tripId, run.days, snapLocationSpelling(tripId, typed));
+    else clearDayLocations(tripId, run.days);
+  }
+  handleCloseCalendarPopover();
 }
 
 // Placed items are rendered as their OWN grid children (siblings of the
@@ -2931,7 +3293,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
       // same as dropping on the backdrop cell there would.
       parts.push(`
         <div class="cal-placed-group allday-group"
-             style="grid-column:${col} / span ${segmentDays.length}; grid-row:2;"
+             style="grid-column:${col} / span ${segmentDays.length}; grid-row:${CALENDAR_SLOT_ROWS.allday};"
              ondragover="handleCalendarDragOver(event)"
              ondragleave="handleCalendarDragLeave(event)"
              ondrop="handleCalendarDrop(event, '${trip.id}', '${segmentDays[0]}', 'allday')">
@@ -2983,7 +3345,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
 // you sleep that night - Luvean's ask once she saw a full-day bar make
 // a no-bed night look covered.
 //
-// Drawn as ONE child of the week's grid (row 7, spanning all seven day
+// Drawn as ONE child of the week's grid (row 8, spanning all seven day
 // columns) holding its own inner grid of 14 half-day columns. With the
 // same 6px gap as .cal-grid, two halves plus the gap between them come
 // out exactly one day wide, so the halves line up with the days above.
@@ -3037,8 +3399,16 @@ function calendarNightTrackHtml(weekDayKeys, trip, gaps) {
     const when = nights === 1
       ? `the night of ${shortDateLabel(run.start)}`
       : `the nights of ${shortDateLabel(run.start)} to ${shortDateLabel(lastNightKey)}`;
-    // Options in The Plan whose stay overlaps any night of this gap.
-    const options = gaps.planLodging.filter((o) => o.checkInDate < run.end && o.checkOutDate > run.start);
+    // Options in The Plan whose stay overlaps any night of this gap,
+    // plus undated ones whose region matches where the Location row
+    // says you'll be on one of those nights (LUV-51).
+    const plannedHere = scheduledDateRange(run.start, nights)
+      .map((night) => locationKey(gaps.dayLocations[night]))
+      .filter(Boolean);
+    const options = [
+      ...gaps.planLodging.filter((o) => o.checkInDate < run.end && o.checkOutDate > run.start),
+      ...gaps.planUndatedLodging.filter((o) => locationKey(o.region) && plannedHere.includes(locationKey(o.region)))
+    ];
     if (options.length) {
       const names = options.map((o) => o.title).join(", ");
       parts.push(`
@@ -3162,6 +3532,7 @@ function handleOpenTransportGap(event, key) {
   event.stopPropagation();
   openTransportGapKey = key;
   openCalendarPopoverIdeaId = null;
+  openLocationRunDay = null;
   openCalendarPopoverAnchorKey = `transport-${key}`;
   renderTabContent(getActiveTrip());
 }
