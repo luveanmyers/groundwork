@@ -73,6 +73,12 @@ let openCalendarPopoverAnchorKey = null;
 // openCalendarPopoverIdeaId is ever set.
 let openTransportGapKey = null;
 
+// Which red sign on the Lodging row (LUV-52), if any, has its details
+// popup open: "gap-<first night>" for a night with no bed, or
+// "group-<first stay's id>" for a "Pick one" box of stays sharing a
+// night. Shares the card popover's slot too.
+let openFlagKey = null;
+
 // The calendar's Location row (LUV-51). editingLocationDay is the day
 // whose cell is showing a text box; locationDraft is what's been typed
 // in it so far, so a re-render (Dave planning another day, say) puts
@@ -84,7 +90,7 @@ let locationDraft = "";
 let openLocationRunDay = null;
 
 function isCalendarPopoverOpen() {
-  return !!(openCalendarPopoverIdeaId || openTransportGapKey || openLocationRunDay);
+  return !!(openCalendarPopoverIdeaId || openTransportGapKey || openLocationRunDay || openFlagKey);
 }
 
 // Whether the "Add an idea" form is currently open. Same reasoning as
@@ -1600,6 +1606,7 @@ function kanbanCardHtml(trip, idea, columnKey) {
 
   return `
     <div class="kanban-card ${isExpanded ? "is-expanded" : ""}"
+         data-idea-id="${idea.id}"
          draggable="${isExpanded ? "false" : "true"}"
          ondragstart="handleDragStart(event, '${idea.id}')"
          ondragend="handleDragEnd(event)">
@@ -2396,8 +2403,7 @@ function calendarStays(scheduledIdeas) {
       const range = scheduledDateRange(idea.scheduled.date, idea.scheduled.span || 1);
       return { idea, checkIn: range[0], checkOut: range[range.length - 1] };
     })
-    .sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : a.checkOut < b.checkOut ? -1 : 1))
-    .map(assignStayLanes());
+    .sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : a.checkOut < b.checkOut ? -1 : 1));
 }
 
 // Do two stays share at least one night? Back-to-back stays (one checks
@@ -2407,24 +2413,67 @@ function staysShareANight(a, b) {
   return a.checkIn < b.checkOut && b.checkIn < a.checkOut;
 }
 
-// Two stays in The Itinerary on the same night would otherwise sit in
-// the same half-day columns and hide each other. Each stay gets a lane
-// (its line within the Lodging row): the first lane where it doesn't
-// share a night with anything already there. Lane 1 is the normal
-// case; a second lane only appears when something is double-booked.
-// Also records which other stays share a night with it, for the red
-// "Pick one" sign. Lanes are worked out over the whole trip, so a stay
-// keeps the same line across a week boundary. Used as a .map() callback
-// over stays sorted by check-in.
-function assignStayLanes() {
-  const lanes = []; // lanes[n] = stays already placed on line n+1
-  return (stay, i, all) => {
-    let lane = lanes.findIndex((laneStays) => !laneStays.some((other) => staysShareANight(other, stay)));
-    if (lane === -1) { lanes.push([]); lane = lanes.length - 1; }
-    lanes[lane].push(stay);
-    const overlaps = all.filter((other) => other !== stay && staysShareANight(other, stay)).map((o) => o.idea);
-    return { ...stay, lane: lane + 1, overlaps };
-  };
+// Is this stay actually booked, not just chosen? Moving a hotel into
+// The Itinerary only means "this is the one"; it may still need
+// booking (LUV-52, Luvean's ask). It counts as booked when the card is
+// marked Reserved, or when its confirmation details have anything in
+// them - typing "Staying with Mia" there works for a stay with nothing
+// to book. Reads fields every card already has; nothing new is saved.
+function isStayBooked(idea) {
+  return (idea.reservationNeeded && idea.reserved) || (idea.confirmationInfo || "").trim() !== "";
+}
+
+// What the Lodging row actually draws (LUV-52). Stays that share a
+// night are gathered into one group (a chain of overlaps counts as one
+// group). Then, per group:
+//   - one stay alone: drawn as a normal bar;
+//   - exactly ONE of them booked: that one settles the night and is
+//     drawn alone. The others aren't drawn - they stay in The
+//     Itinerary column on the board, untouched (Luvean: an active
+//     reservation just means "this is the hotel I picked");
+//   - none booked, or more than one booked (a real double booking):
+//     one red "Pick one" box across all of their nights.
+// Returns { items, drawnStays }. items, oldest first, are
+// { kind: "stay", stay } or { kind: "group", key, stays, checkIn,
+// checkOut, bookedCount }. drawnStays are the stays still standing
+// (the box's stays included), which is what the "No lodging" and
+// transport checks read, so the flags agree with what's drawn.
+// Before LUV-52 every stay was drawn, double-booked ones on a second
+// line with a red "Pick one" chip each.
+function lodgingRowItems(stays) {
+  const groups = [];
+  stays.forEach((stay) => {
+    // Stays arrive sorted by check-in, so a stay can only chain onto
+    // the most recent group.
+    const last = groups[groups.length - 1];
+    if (last && last.some((other) => staysShareANight(other, stay))) last.push(stay);
+    else groups.push([stay]);
+  });
+  const items = [];
+  const drawnStays = [];
+  groups.forEach((group) => {
+    if (group.length === 1) {
+      items.push({ kind: "stay", stay: group[0] });
+      drawnStays.push(group[0]);
+      return;
+    }
+    const booked = group.filter((s) => isStayBooked(s.idea));
+    if (booked.length === 1) {
+      items.push({ kind: "stay", stay: booked[0] });
+      drawnStays.push(booked[0]);
+      return;
+    }
+    items.push({
+      kind: "group",
+      key: `group-${group[0].idea.id}`,
+      stays: group,
+      checkIn: group[0].checkIn,
+      checkOut: group.reduce((latest, s) => (s.checkOut > latest ? s.checkOut : latest), group[0].checkOut),
+      bookedCount: booked.length
+    });
+    drawnStays.push(...group);
+  });
+  return { items, drawnStays };
 }
 
 // Runs of nights with no Lodging card, as { start, end } where start
@@ -2546,10 +2595,10 @@ function itineraryTabHtml(trip) {
 
   // Gap flags (LUV-29) - worked out once here, then each week draws
   // whatever part of them falls inside it.
-  const stays = calendarStays(scheduledIdeas);
+  const { items: lodgingItems, drawnStays: stays } = lodgingRowItems(calendarStays(scheduledIdeas));
   const dayLocations = getDayLocations(trip.id);
   const gaps = {
-    stays,
+    lodgingItems,
     lodgingRuns: lodgingGapRuns(trip, stays),
     planLodging: planLodgingOptions(trip.id),
     planUndatedLodging: planUndatedLodgingOptions(trip.id),
@@ -2578,6 +2627,17 @@ function itineraryTabHtml(trip) {
     ? gaps.transport.find((g) => g.key === openTransportGapKey)
     : null;
 
+  // A red sign's details popup (LUV-52): either a night with no bed
+  // ("gap-<first night>") or a "Pick one" box of stays sharing a night
+  // ("group-<first stay's id>"). Worked out fresh, so if the sign has
+  // gone (Dave booked a hotel meanwhile) there's simply nothing to show.
+  const openGapRun = openFlagKey && openFlagKey.startsWith("gap-")
+    ? gaps.lodgingRuns.find((run) => `gap-${run.start}` === openFlagKey)
+    : null;
+  const openStayGroup = openFlagKey && openFlagKey.startsWith("group-")
+    ? gaps.lodgingItems.find((item) => item.kind === "group" && item.key === openFlagKey)
+    : null;
+
   return `
     <div class="calendar-layout">
       <div class="calendar-sidebar"
@@ -2599,6 +2659,8 @@ function itineraryTabHtml(trip) {
       </div>
       ${openPopoverIdea ? calendarEditPopoverHtml(trip, openPopoverIdea) : ""}
       ${openTransportGap ? transportGapPopoverHtml(trip, openTransportGap) : ""}
+      ${openGapRun ? lodgingGapPopoverHtml(trip, openGapRun, gaps) : ""}
+      ${openStayGroup ? stayGroupPopoverHtml(trip, openStayGroup) : ""}
       ${openLocationRun ? locationPopoverHtml(trip, openLocationRun) : ""}
       <datalist id="location-suggestions">
         ${locationSuggestions(trip.id, dayLocations).map((name) => `<option value="${escapeHtml(name)}"></option>`).join("")}
@@ -2655,6 +2717,7 @@ function handleOpenCalendarPopover(event, tripId, ideaId, anchorKey) {
   openCalendarPopoverAnchorKey = anchorKey;
   openTransportGapKey = null;
   openLocationRunDay = null;
+  openFlagKey = null;
   renderTabContent(getActiveTrip());
 }
 
@@ -2663,6 +2726,7 @@ function handleCloseCalendarPopover() {
   openCalendarPopoverAnchorKey = null;
   openTransportGapKey = null;
   openLocationRunDay = null;
+  openFlagKey = null;
   renderTabContent(getActiveTrip());
 }
 
@@ -2688,7 +2752,7 @@ function positionCalendarPopover() {
   const anchor = document.querySelector(`[data-popover-anchor="${openCalendarPopoverAnchorKey}"]`);
   // No anchor means whatever it was attached to is gone (e.g. Dave
   // added the Transport card that cleared a warning) - close quietly.
-  if (!anchor) { openCalendarPopoverIdeaId = null; openCalendarPopoverAnchorKey = null; openTransportGapKey = null; openLocationRunDay = null; return; }
+  if (!anchor) { openCalendarPopoverIdeaId = null; openCalendarPopoverAnchorKey = null; openTransportGapKey = null; openLocationRunDay = null; openFlagKey = null; return; }
 
   const r = anchor.getBoundingClientRect();
   let top = r.bottom + 8;
@@ -3062,7 +3126,10 @@ function calendarLocationRowHtml(week, trip, inTrip, locations) {
            tabindex="0"
            onclick="handleOpenLocationRun(event, '${firstDay}', '${anchorKey}')"
            onkeydown="if (event.key === 'Enter' && event.target === this) handleOpenLocationRun(event, '${firstDay}', '${anchorKey}')">
-        <span class="loc-name">${escapeHtml(run.name)}</span>
+        <span class="loc-left">
+          <span class="loc-name">${escapeHtml(run.name)}</span>
+          <svg class="loc-edit-hint" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-edit"/></svg>
+        </span>
         ${controls}
       </div>`);
   });
@@ -3089,6 +3156,7 @@ function handleStartLocationEdit(event, day) {
   openCalendarPopoverAnchorKey = null;
   openTransportGapKey = null;
   openLocationRunDay = null;
+  openFlagKey = null;
   editingLocationDay = day;
   locationDraft = "";
   renderTabContent(getActiveTrip());
@@ -3167,6 +3235,7 @@ function handleOpenLocationRun(event, day, anchorKey) {
   event.stopPropagation();
   openCalendarPopoverIdeaId = null;
   openTransportGapKey = null;
+  openFlagKey = null;
   openLocationRunDay = day;
   openCalendarPopoverAnchorKey = anchorKey;
   renderTabContent(getActiveTrip());
@@ -3247,14 +3316,13 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
     const col = 2 + weekDayKeys.indexOf(dayKey);
     const row = CALENDAR_SLOT_ROWS[slotKey];
     const items = bySlotFootprint[key];
-    // LUV-7 Step 3: two (or more) DIFFERENT ideas sharing the exact
-    // same footprint is the deliberate stacking case (never evicted -
-    // see the multi-item-stacking decision above), but it's still
-    // worth flagging visibly in case it's an accidental double-booking
-    // rather than an intentional pairing. Ambient warning, not a
-    // block - matches the confirmed collision-handling decision
-    // (product-decisions.md, 2026-09-07).
-    const hasConflict = items.length > 1;
+    // Two (or more) DIFFERENT ideas sharing the exact same footprint
+    // is the deliberate stacking case (never evicted - see the
+    // multi-item-stacking decision above). They used to get a red
+    // border and a warning sign in case it was an accidental double
+    // booking (LUV-7 Step 3); LUV-52 removed it, since short activities
+    // often share a slot on purpose and a warning on something that's
+    // fine teaches you to ignore warnings.
     // This group sits on top of its backdrop .cal-cell (later in the
     // markup, same grid area), so it's what's actually under the
     // cursor once a cell holds anything - without its own drop
@@ -3267,7 +3335,7 @@ function calendarPlacedItemsHtml(scheduledIdeas, weekDayKeys, trip, itineraryIde
            ondragover="handleCalendarDragOver(event)"
            ondragleave="handleCalendarDragLeave(event)"
            ondrop="handleCalendarDrop(event, '${trip.id}', '${dayKey}', '${slotKey}')">
-        ${items.map((idea) => calendarPlacedCardHtml(idea, trip, span, undefined, undefined, undefined, hasConflict)).join("")}
+        ${items.map((idea) => calendarPlacedCardHtml(idea, trip, span)).join("")}
       </div>
     `);
   });
@@ -3381,48 +3449,42 @@ function calendarNightTrackHtml(weekDayKeys, trip, gaps) {
   const clipClasses = (p) => `${p.startsEarlier ? " stay-starts-earlier" : ""}${p.continues ? " stay-continues" : ""}`;
   const parts = [];
 
-  gaps.stays.forEach((stay) => {
-    const p = placement(stay.checkIn, stay.checkOut);
+  gaps.lodgingItems.forEach((item) => {
+    const isGroup = item.kind === "group";
+    const p = isGroup ? placement(item.checkIn, item.checkOut) : placement(item.stay.checkIn, item.stay.checkOut);
     if (!p) return;
-    // The transport warning rides on the stay you're travelling TO,
-    // on the segment where that stay begins.
-    const gap = p.startsEarlier ? null : gaps.transport.find((g) => g.toIdeaId === stay.idea.id);
-    const chips = (stay.overlaps.length ? overlapChipHtml(stay) : "") + (gap ? transportChipHtml(trip, gap) : "");
-    parts.push(calendarLodgingBarHtml(stay, trip, p, clipClasses(p), chips));
+    // The transport warning rides on the stay you're travelling TO, on
+    // the segment where that stay begins - or on the "Pick one" box
+    // when that stay is one of the box's.
+    const ids = isGroup ? item.stays.map((s) => s.idea.id) : [item.stay.idea.id];
+    const gap = p.startsEarlier ? null : gaps.transport.find((g) => ids.includes(g.toIdeaId));
+    const chip = gap ? transportChipHtml(trip, gap) : "";
+    parts.push(isGroup
+      ? stayGroupBoxHtml(item, p, clipClasses(p), chip, weekFirst)
+      : calendarLodgingBarHtml(item.stay, trip, p, clipClasses(p), chip));
   });
 
   gaps.lodgingRuns.forEach((run) => {
     const p = placement(run.start, run.end);
     if (!p) return;
-    const nights = daysBetweenDates(run.start, run.end);
-    const lastNightKey = scheduledDateRange(run.start, nights)[nights - 1];
-    const when = nights === 1
-      ? `the night of ${shortDateLabel(run.start)}`
-      : `the nights of ${shortDateLabel(run.start)} to ${shortDateLabel(lastNightKey)}`;
-    // Options in The Plan whose stay overlaps any night of this gap,
-    // plus undated ones whose region matches where the Location row
-    // says you'll be on one of those nights (LUV-51).
-    const plannedHere = scheduledDateRange(run.start, nights)
-      .map((night) => locationKey(gaps.dayLocations[night]))
-      .filter(Boolean);
-    const options = [
-      ...gaps.planLodging.filter((o) => o.checkInDate < run.end && o.checkOutDate > run.start),
-      ...gaps.planUndatedLodging.filter((o) => locationKey(o.region) && plannedHere.includes(locationKey(o.region)))
-    ];
-    if (options.length) {
-      const names = options.map((o) => o.title).join(", ");
-      parts.push(`
-        <div class="cal-gap-flag gap-pick${clipClasses(p)}" style="grid-row:1; grid-column:${p.column};"
-             title="${escapeHtml(`No lodging chosen for ${when}. Options in The Plan: ${names}. Move one into The Itinerary.`)}">
-          ${flagIconHtml("i-stop")}<span class="gap-lines"><span>Pick one</span><span class="gap-sub">${options.length} ${options.length === 1 ? "option" : "options"} in The Plan</span></span>
-        </div>`);
-      return;
-    }
+    const options = lodgingGapOptions(run, gaps);
+    const label = options.length
+      ? `${flagIconHtml("i-stop")}<span class="gap-lines"><span>Pick one</span><span class="gap-sub">${options.length} ${options.length === 1 ? "option" : "options"} in The Plan</span></span>`
+      : `${flagIconHtml("i-stop")}<span>No lodging</span>`;
+    // A real <button>, so it can be clicked, tapped or reached by
+    // keyboard (LUV-52). Its details used to live only in a hover
+    // tooltip, which is slow to appear and doesn't exist on a phone.
+    // A gap that crosses a week boundary draws twice, so the anchor
+    // names the week too - the popup opens under the one clicked.
+    const anchorKey = `gap-${run.start}-${weekFirst}`;
     parts.push(`
-      <div class="cal-gap-flag${clipClasses(p)}" style="grid-row:1; grid-column:${p.column};"
-           title="No lodging booked for ${when}. Add a Lodging card to fix it.">
-        ${flagIconHtml("i-stop")}<span>No lodging</span>
-      </div>`);
+      <button type="button" class="cal-gap-flag${options.length ? " gap-pick" : ""}${clipClasses(p)}"
+              style="grid-row:1; grid-column:${p.column};"
+              data-popover-anchor="${anchorKey}"
+              aria-label="${escapeHtml(`${options.length ? "Pick one" : "No lodging"}: ${lodgingGapWhen(run)}. Show details.`)}"
+              onclick="handleOpenFlag(event, 'gap-${run.start}', '${anchorKey}')">
+        ${label}
+      </button>`);
   });
 
   if (!parts.length) return "";
@@ -3430,6 +3492,41 @@ function calendarNightTrackHtml(weekDayKeys, trip, gaps) {
     <div class="cal-night-track" style="grid-row:${CALENDAR_SLOT_ROWS.lodging}; grid-column:2 / span 7;">
       ${parts.join("")}
     </div>`;
+}
+
+// "the night of Jul 9" / "the nights of Jul 9 to Jul 11" for a run of
+// nights with no bed.
+function lodgingGapWhen(run) {
+  const nights = daysBetweenDates(run.start, run.end);
+  const lastNightKey = scheduledDateRange(run.start, nights)[nights - 1];
+  return nights === 1
+    ? `the night of ${shortDateLabel(run.start)}`
+    : `the nights of ${shortDateLabel(run.start)} to ${shortDateLabel(lastNightKey)}`;
+}
+
+// Lodging cards in The Plan that could fill a run of nights with no
+// bed: dated ones whose stay overlaps any of those nights, plus undated
+// ones whose region matches where the Location row says you'll be on
+// one of those nights (LUV-51).
+function lodgingGapOptions(run, gaps) {
+  const nights = scheduledDateRange(run.start, daysBetweenDates(run.start, run.end));
+  const plannedHere = nights.map((night) => locationKey(gaps.dayLocations[night])).filter(Boolean);
+  return [
+    ...gaps.planLodging.filter((o) => o.checkInDate < run.end && o.checkOutDate > run.start),
+    ...gaps.planUndatedLodging.filter((o) => locationKey(o.region) && plannedHere.includes(locationKey(o.region)))
+  ];
+}
+
+// The places the Location row has planned for a run of nights, each
+// once, in order - for the popup's "you'll be in ..." line.
+function plannedPlacesFor(run, dayLocations) {
+  const nights = scheduledDateRange(run.start, daysBetweenDates(run.start, run.end));
+  const seen = new Map();
+  nights.forEach((night) => {
+    const name = (dayLocations[night] || "").trim();
+    if (name && !seen.has(locationKey(name))) seen.set(locationKey(name), name);
+  });
+  return [...seen.values()];
 }
 
 // "2027-07-09" -> "Jul 9", matching the calendar's own day headers.
@@ -3452,9 +3549,13 @@ function calendarLodgingBarHtml(stay, trip, place, clipClasses, chipHtml) {
   const times = [];
   if (!place.startsEarlier && idea.checkInTime) times.push(`In ${formatTimeShort(idea.checkInTime)}`);
   if (!place.continues && idea.checkOutTime) times.push(`Out ${formatTimeShort(idea.checkOutTime)}`);
+  // Chosen isn't booked (LUV-52): a stay that isn't booked yet gets a
+  // yellow dashed outline and a tag, so it doesn't pass for a done
+  // deal. See isStayBooked() for what counts.
+  const booked = isStayBooked(idea);
   return `
-    <div class="cal-placed-card allday-bar lodging-bar${clipClasses}${stay.overlaps.length ? " has-overlap" : ""}"
-         style="grid-row:${stay.lane}; grid-column:${place.column};"
+    <div class="cal-placed-card allday-bar lodging-bar${clipClasses}${booked ? "" : " not-booked"}"
+         style="grid-row:1; grid-column:${place.column};"
          data-popover-anchor="${idea.id}"
          draggable="false"
          onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}', '${idea.id}')">
@@ -3462,19 +3563,202 @@ function calendarLodgingBarHtml(stay, trip, place, clipClasses, chipHtml) {
         <span class="placed-label"><span class="placed-title">${escapeHtml(idea.title)}</span></span>
       </div>
       ${times.length ? `<div class="placed-time-row">${times.join(" &middot; ")}</div>` : ""}
+      ${booked ? "" : `<span class="not-booked-tag">Not booked</span>`}
       ${chipHtml}
     </div>`;
 }
 
-// Red "Pick one" on a stay that shares a night with another stay in
-// The Itinerary. Must be fixed, like "No lodging" - keep one and move
-// the other out of The Itinerary - so it's not clickable or dismissible.
-function overlapChipHtml(stay) {
-  const others = stay.overlaps.map((o) => o.title).join(", ");
+// Red "Pick one" box: stays in The Itinerary that share a night, where
+// none - or more than one - is booked (see lodgingRowItems()). One box
+// across all their nights instead of the stays stacked on top of each
+// other (Luvean's call, LUV-52). A <div> acting as a button rather than
+// a real <button>, because the transport chip inside it is a button
+// already and buttons can't nest; the chip stops its own click.
+function stayGroupBoxHtml(group, place, clipClasses, chipHtml, weekFirst) {
+  const n = group.stays.length;
+  const sub = group.bookedCount > 1 ? `${n} stays booked` : `${n} stays chosen`;
+  const anchorKey = `${group.key}-${weekFirst}`;
+  const open = `handleOpenFlag(event, '${group.key}', '${anchorKey}')`;
   return `
-    <span class="overlap-chip" title="${escapeHtml(`Also booked for some of the same nights: ${others}. Keep one and move the other out of The Itinerary.`)}">
-      ${flagIconHtml("i-stop")}<span>Pick one</span>
-    </span>`;
+    <div class="cal-gap-flag gap-pick stay-group-box${clipClasses}"
+         style="grid-row:1; grid-column:${place.column};"
+         data-popover-anchor="${anchorKey}"
+         role="button" tabindex="0"
+         aria-label="${escapeHtml(`Pick one: ${group.stays.map((s) => s.idea.title).join(", ")}. Show details.`)}"
+         onclick="${open}"
+         onkeydown="if ((event.key === 'Enter' || event.key === ' ') && event.target === this) { event.preventDefault(); ${open}; }">
+      <span class="stay-group-head">${flagIconHtml("i-stop")}<span class="gap-lines"><span>Pick one</span><span class="gap-sub">${sub}</span></span></span>
+      ${chipHtml}
+    </div>`;
+}
+
+// "Jul 9 -> Jul 10" for a Lodging card's own dates, or "No dates yet".
+function stayDatesLabel(idea) {
+  return idea.checkInDate && idea.checkOutDate && idea.checkInDate < idea.checkOutDate
+    ? `${shortDateLabel(idea.checkInDate)} &rarr; ${shortDateLabel(idea.checkOutDate)}`
+    : "No dates yet";
+}
+
+// One line in a flag popup: a card's name, a detail line, and buttons.
+function flagOptionHtml(title, sub, buttons) {
+  return `
+    <div class="flag-option">
+      <div class="flag-option-text">
+        <div class="flag-option-name">${escapeHtml(title)}</div>
+        <div class="flag-option-sub">${sub}</div>
+      </div>
+      <div class="flag-option-btns">${buttons}</div>
+    </div>`;
+}
+
+function flagOpenButtonHtml(ideaId) {
+  return `<button type="button" class="btn-secondary" onclick="handleOpenIdeaOnBoard('${ideaId}')">Open</button>`;
+}
+
+// The popup for a night (or run of nights) with no bed. Shares the
+// card popover's id (#cal-edit-popover), like the transport and
+// location popups, so it reuses their positioning and click-outside
+// closing.
+function lodgingGapPopoverHtml(trip, run, gaps) {
+  const options = lodgingGapOptions(run, gaps);
+  const when = lodgingGapWhen(run);
+  const places = plannedPlacesFor(run, gaps.dayLocations);
+  const placesText = places.length ? ` The Location row says ${escapeHtml(places.join(", "))}.` : "";
+  const nights = daysBetweenDates(run.start, run.end);
+  const title = `${options.length ? "Pick one" : "No lodging"} &middot; ${nights === 1 ? "night" : "nights"} of ${shortDateLabel(run.start)}${nights === 1 ? "" : "&ndash;" + shortDateLabel(scheduledDateRange(run.start, nights)[nights - 1])}`;
+  const head = `
+    <div class="cal-edit-popover-head">
+      <span class="cal-edit-popover-title">${flagIconHtml("i-stop")}<span>${title}</span></span>
+      <button type="button" class="cal-edit-popover-close" title="Close" onclick="handleCloseCalendarPopover()">&times;</button>
+    </div>`;
+
+  if (!options.length) {
+    return `
+      <div class="cal-edit-popover flag-popover" id="cal-edit-popover">
+        ${head}
+        <p class="popover-hint">Nothing booked for ${when}, and nothing waiting in The Plan for it.${placesText}</p>
+        <div class="popover-actions">
+          <button type="button" class="btn-primary" onclick="handleAddLodgingCardForGap('${trip.id}', '${run.start}', '${run.end}')">+ Add a Lodging card</button>
+        </div>
+      </div>`;
+  }
+
+  // Only a dated option can be chosen from here: an undated one moved
+  // into The Itinerary wouldn't land on the calendar, so the sign
+  // would stay.
+  const rows = options.map((o) => {
+    const dated = o.checkInDate && o.checkOutDate && o.checkInDate < o.checkOutDate;
+    const sub = `${stayDatesLabel(o)}${o.region ? ` &middot; ${escapeHtml(o.region)}` : ""}`;
+    const choose = dated ? `<button type="button" class="btn-primary" onclick="handleChooseLodgingOption('${trip.id}', '${o.id}')">Choose</button>` : "";
+    return flagOptionHtml(o.title, sub, choose + flagOpenButtonHtml(o.id));
+  }).join("");
+  const undatedCount = options.filter((o) => !(o.checkInDate && o.checkOutDate && o.checkInDate < o.checkOutDate)).length;
+  const undatedHint = undatedCount === options.length
+    ? "Add check-in and check-out dates to one to choose it."
+    : "To choose one with no dates yet, add its check-in and check-out first.";
+  return `
+    <div class="cal-edit-popover flag-popover" id="cal-edit-popover">
+      ${head}
+      <p class="popover-hint">No bed chosen for ${when}.${placesText} Waiting in The Plan:</p>
+      <div class="flag-options">${rows}</div>
+      ${undatedCount ? `<p class="popover-hint flag-after-hint">${undatedHint}</p>` : ""}
+    </div>`;
+}
+
+// The popup for a "Pick one" box: every stay in it, each with "Keep
+// this one" (the rest go back to The Plan) and "Open".
+function stayGroupPopoverHtml(trip, group) {
+  const n = group.stays.length;
+  const hint = group.bookedCount > 1
+    ? `${group.bookedCount} of these are booked for the same nights. Keep one; the others go back to The Plan, and their bookings will need canceling.`
+    : `${n} stays in The Itinerary share a night. Keep one; the others go back to The Plan.`;
+  const rows = group.stays.map((s) => {
+    const idea = s.idea;
+    const sub = `${shortDateLabel(s.checkIn)} &rarr; ${shortDateLabel(s.checkOut)}${idea.checkInTime ? ` &middot; In ${formatTimeShort(idea.checkInTime)}` : ""} &middot; ${isStayBooked(idea) ? "Booked" : "Not booked"}`;
+    const keep = `<button type="button" class="btn-primary" onclick="handleKeepStay('${trip.id}', '${idea.id}', '${group.key}')">Keep this one</button>`;
+    return flagOptionHtml(idea.title, sub, keep + flagOpenButtonHtml(idea.id));
+  }).join("");
+  return `
+    <div class="cal-edit-popover flag-popover" id="cal-edit-popover">
+      <div class="cal-edit-popover-head">
+        <span class="cal-edit-popover-title">${flagIconHtml("i-stop")}<span>Pick one &middot; ${shortDateLabel(group.checkIn)} &rarr; ${shortDateLabel(group.checkOut)}</span></span>
+        <button type="button" class="cal-edit-popover-close" title="Close" onclick="handleCloseCalendarPopover()">&times;</button>
+      </div>
+      <p class="popover-hint">${hint}</p>
+      <div class="flag-options">${rows}</div>
+    </div>`;
+}
+
+function handleOpenFlag(event, flagKey, anchorKey) {
+  event.stopPropagation();
+  openFlagKey = flagKey;
+  openCalendarPopoverIdeaId = null;
+  openTransportGapKey = null;
+  openLocationRunDay = null;
+  openCalendarPopoverAnchorKey = anchorKey;
+  renderTabContent(getActiveTrip());
+}
+
+// "Choose": moves a Plan hotel into The Itinerary. Its dates place it
+// on the calendar automatically (syncAutoScheduledIdeas()), so its bar
+// replaces the sign straight away - marked "Not booked" until it is.
+function handleChooseLodgingOption(tripId, ideaId) {
+  const idea = getIdeas(tripId).find((i) => i.id === ideaId);
+  openFlagKey = null;
+  moveIdeaToColumn(tripId, ideaId, "itinerary");
+  if (idea) showToast(`Moved "${idea.title}" into The Itinerary.`);
+}
+
+// "Keep this one": every other stay in the box goes back to The Plan.
+// moveIdeaToColumn() asks first about any with an active reservation,
+// as the board does; saying no leaves that one where it is.
+function handleKeepStay(tripId, keepId, groupKey) {
+  const trip = getActiveTrip();
+  const scheduled = getIdeas(tripId).filter((i) => columnKeyForIdea(i) === "itinerary" && i.scheduled && i.scheduled.date);
+  const group = lodgingRowItems(calendarStays(scheduled)).items.find((item) => item.kind === "group" && item.key === groupKey);
+  openFlagKey = null;
+  if (!group) { renderTabContent(trip); return; }
+  group.stays
+    .filter((s) => s.idea.id !== keepId)
+    .forEach((s) => moveIdeaToColumn(tripId, s.idea.id, "plan"));
+  renderTabContent(getActiveTrip());
+}
+
+// "+ Add a Lodging card": a Lodging card in The Plan with the missing
+// nights and the planned place already filled in, then opened on the
+// board so the hotel's name can go straight in. Like "+ Add a
+// Transport card", the sign stays until it's in The Itinerary.
+function handleAddLodgingCardForGap(tripId, start, end) {
+  const place = plannedPlacesFor({ start, end }, getDayLocations(tripId))[0] || "";
+  const idea = addIdea(tripId, {
+    title: place ? `Lodging: ${place}` : "Lodging",
+    activityType: "lodging",
+    region: place,
+    checkInDate: start,
+    checkOutDate: end,
+    reservationNeeded: true,
+    selected: true
+  });
+  showToast("Added a Lodging card to The Plan. It clears the sign once it's in The Itinerary.");
+  handleOpenIdeaOnBoard(idea.id);
+}
+
+// "Open": switches to the Ideas board with that card expanded and
+// scrolled into view. Filters go back to showing everything, and Map
+// switches to Board, so nothing can hide the card being opened.
+function handleOpenIdeaOnBoard(ideaId) {
+  openFlagKey = null;
+  openCalendarPopoverAnchorKey = null;
+  ideaFilters = defaultIdeaFilters();
+  ideasView = "board";
+  expandedIdeaIds.add(ideaId);
+  showTab("ideas");
+  const card = document.querySelector(`.kanban-card[data-idea-id="${ideaId}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("just-opened");
+    setTimeout(() => card.classList.remove("just-opened"), 1600);
+  }
 }
 
 // The amber transport warning, or - once marked sorted - a calm grey
@@ -3533,6 +3817,7 @@ function handleOpenTransportGap(event, key) {
   openTransportGapKey = key;
   openCalendarPopoverIdeaId = null;
   openLocationRunDay = null;
+  openFlagKey = null;
   openCalendarPopoverAnchorKey = `transport-${key}`;
   renderTabContent(getActiveTrip());
 }
@@ -3602,7 +3887,7 @@ function showToast(message) {
 // LUV-29 they're drawn by calendarLodgingBarHtml() on their own
 // half-day track instead, so no caller passes false today. The
 // parameter stays so a future non-draggable card type can reuse it.
-function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment, interactive, hasConflict) {
+function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment, interactive) {
   const slotKey = idea.scheduled.slot;
   const isMultiDayBar = slotKey === "allday" || slotKey === "lodging";
   const lastSegment = isLastSegment === undefined ? true : isLastSegment;
@@ -3635,12 +3920,8 @@ function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment,
     ? `draggable="true" ondragstart="handleDragStart(event, '${idea.id}')" ondragend="handleDragEnd(event)"`
     : `draggable="false"`;
 
-  const conflictBadge = hasConflict
-    ? `<span class="conflict-badge" title="Another item is scheduled in this same slot">&#9888;</span>`
-    : "";
-
   return `
-    <div class="cal-placed-card${isMultiDayBar ? " allday-bar" : ""}${slotKey === "lodging" ? " lodging-bar" : ""}${hasConflict ? " has-conflict" : ""}"
+    <div class="cal-placed-card${isMultiDayBar ? " allday-bar" : ""}${slotKey === "lodging" ? " lodging-bar" : ""}"
          data-popover-anchor="${idea.id}"
          ${dragAttrs}
          onclick="handleOpenCalendarPopover(event, '${trip.id}', '${idea.id}', '${idea.id}')">
@@ -3648,7 +3929,6 @@ function calendarPlacedCardHtml(idea, trip, span, isLastSegment, isFirstSegment,
         <span class="placed-label">
           ${activityTypeIconHtml(idea.activityType)}
           <span class="placed-title">${escapeHtml(idea.title)}</span>
-          ${conflictBadge}
         </span>
         ${controls}
       </div>
