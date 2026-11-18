@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SetOut - Location row (LUV-51) v2</title>
+<title>SetOut - Location row (LUV-51) v3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Manrope:wght@400;500;600;700;800&family=Yeseva+One&display=swap" rel="stylesheet">
@@ -34,6 +34,10 @@
     background: none;
     border: 1px dashed var(--border);
   }
+  /* v3: a day outside the trip in this row keeps the row's short
+     height. Without this it took .cal-cell's 48px minimum and made the
+     first week's row taller than the second's. */
+  .cal-cell.cal-location-outside { min-height: 30px; padding: 0; }
   .cal-location-cell .loc-add {
     font-size: 0.72rem;
     color: var(--ink-faint);
@@ -102,7 +106,7 @@
 </head>
 <body>
 
-<div class="mockup-banner">MOCKUP v2 - review only (LUV-51). Nothing here saves. Uses the real css/style.css.</div>
+<div class="mockup-banner">MOCKUP v3 - review only (LUV-51). Nothing here saves. Uses the real css/style.css.</div>
 
 <div class="mockup-note" style="border-color:var(--accent);">
   <b>v2: lining Location up with Lodging (your test finding).</b> In v1, Edinburgh covered Jul 6&ndash;8 as whole days, but the Edinburgh flat runs from check-in on the <i>evening</i> of Jul 6 to check-out on the <i>morning</i> of Jul 9 (the half-day Lodging row from LUV-29). So the two were half a day apart. Use the <b>Location bars</b> switch below to compare:
@@ -417,7 +421,7 @@
       // Empty cells (or the typing box) for days with no location.
       week.forEach((d, i) => {
         const col = 2 + i;
-        if (!inTrip(d)) { html += `<div class="cal-cell outside-trip loc-render" style="grid-row:2; grid-column:${col};"></div>`; return; }
+        if (!inTrip(d)) { html += `<div class="cal-cell outside-trip cal-location-outside loc-render" style="grid-row:2; grid-column:${col};"></div>`; return; }
         if (dayLocations[d] && editingDay !== d) return;
         const inner = editingDay === d
           ? `<input type="text" list="loc-suggestions" placeholder="e.g. Edinburgh" onkeydown="handleCellKey(event, '${d}')" onblur="saveCell('${d}', this.value)" />`

@@ -2386,6 +2386,14 @@ button.primary:active {
   cursor: pointer;
   min-width: 0;
 }
+/* A day outside the trip keeps this row's short height. Without this
+   it takes .cal-cell's 48px minimum, and a week with days outside the
+   trip gets a taller Location row than the others (caught by Luvean
+   in testing). */
+.cal-cell.cal-location-outside {
+  min-height: 30px;
+  padding: 0;
+}
 .cal-location-cell .loc-add {
   font-size: 0.72rem;
   color: var(--ink-faint);

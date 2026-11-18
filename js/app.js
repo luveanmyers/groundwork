@@ -2983,7 +2983,7 @@ function calendarLocationRowHtml(week, trip, inTrip, locations) {
     const day = weekDayKeys[i];
     const pos = `grid-row:${LOCATION_ROW}; grid-column:${col};`;
     if (!inTrip(date)) {
-      parts.push(`<div class="cal-cell outside-trip" style="${pos}"></div>`);
+      parts.push(`<div class="cal-cell outside-trip cal-location-outside" style="${pos}"></div>`);
       return;
     }
     if (editingLocationDay === day) {
