@@ -2190,7 +2190,6 @@ button.primary:active {
   display: grid;
   grid-template-columns: repeat(14, minmax(52px, 1fr));
   column-gap: 6px;
-  row-gap: 4px; /* between stays stacked because they share a night */
   min-width: 0;
   padding: 2px 0;
 }
@@ -2220,7 +2219,8 @@ button.primary:active {
 
 /* Red stop sign: a night with no Lodging card. Must be fixed, so it
    can't be dismissed - it clears once a Lodging card covers the night.
-   Dashed, so it reads as "something missing", not "something placed". */
+   Dashed, so it reads as "something missing", not "something placed".
+   Clicking it opens its details popup (LUV-52). */
 .cal-gap-flag {
   border: 1px dashed var(--danger);
   background: var(--danger-soft);
@@ -2236,7 +2236,18 @@ button.primary:active {
   min-height: 40px;
   white-space: nowrap;
   overflow: hidden;
-  cursor: default;
+  cursor: pointer;
+}
+/* The sign is a real <button>: these undo a button's own font and
+   alignment so it looks the same as before. */
+button.cal-gap-flag {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: left;
+}
+.cal-gap-flag:hover {
+  filter: brightness(0.96);
 }
 
 /* Same stop sign when dated Lodging options are waiting in The Plan:
@@ -2256,26 +2267,45 @@ button.primary:active {
   font-size: 0.68rem;
 }
 
-/* Two stays in The Itinerary on the same night: both show, stacked,
-   with a red border and a red "Pick one" chip. Not clickable. */
-.cal-placed-card.lodging-bar.has-overlap {
-  border-color: var(--danger);
+/* Stays in The Itinerary that share a night, none (or more than one)
+   of them booked: one red "Pick one" box across their nights, drawn
+   like the gap sign (LUV-52). Stacked in a column so a transport chip
+   can sit under the label. */
+.cal-gap-flag.stay-group-box {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
 }
-.overlap-chip {
+.stay-group-box .stay-group-head {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+}
+
+/* A stay on the calendar that isn't booked yet (LUV-52): amber, the
+   "still to do" colour, and dashed like the other "something's
+   missing" signs, so a chosen hotel doesn't pass for a booked one. */
+.cal-placed-card.lodging-bar.not-booked {
+  border: 1.5px dashed var(--warning);
+}
+.not-booked-tag {
+  display: inline-block;
   margin-top: 2px;
-  padding: 1px 6px 1px 3px;
+  padding: 0 6px;
   border-radius: var(--radius-pill);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.5;
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid var(--warning);
   align-self: flex-start;
-  border: 1px dashed var(--danger);
-  background: var(--danger-soft);
-  color: var(--danger);
-  cursor: default;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
 }
 
 /* Amber warning: no dated Flight/Transport card between two stays in
@@ -2317,21 +2347,24 @@ button.primary:active {
   color: var(--warning);
 }
 .transport-popover .popover-hint,
-.location-popover .popover-hint {
+.location-popover .popover-hint,
+.flag-popover .popover-hint {
   font-size: 0.78rem;
   color: var(--ink-soft);
   margin: 0 0 10px;
   line-height: 1.45;
 }
 .transport-popover .popover-actions,
-.location-popover .popover-actions {
+.location-popover .popover-actions,
+.flag-popover .popover-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 12px;
 }
 .transport-popover .popover-actions button,
-.location-popover .popover-actions button {
+.location-popover .popover-actions button,
+.flag-popover .popover-actions button {
   font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
@@ -2340,16 +2373,80 @@ button.primary:active {
   cursor: pointer;
 }
 .transport-popover .btn-primary,
-.location-popover .btn-primary {
+.location-popover .btn-primary,
+.flag-popover .btn-primary {
   background: var(--accent-vivid);
   color: #fff;
   border: 1px solid var(--accent-vivid);
 }
 .transport-popover .btn-secondary,
-.location-popover .btn-secondary {
+.location-popover .btn-secondary,
+.flag-popover .btn-secondary {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--border);
+}
+
+/* The red signs' details popup (LUV-52): one line per hotel or stay,
+   each with its own small buttons. */
+/* A little wider than the other popups, so a hotel's name still fits
+   beside its two buttons. max-width on .cal-edit-popover keeps it on a
+   phone screen. */
+.cal-edit-popover.flag-popover {
+  width: 320px;
+}
+.flag-popover .cal-edit-popover-title .flag-icon {
+  color: var(--danger);
+}
+.flag-options {
+  border-top: 1px solid var(--border);
+}
+.flag-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.flag-option-text {
+  flex: 1;
+  min-width: 0;
+}
+.flag-option-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flag-option-sub {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+.flag-option-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.flag-option-btns button {
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.flag-popover .flag-after-hint {
+  margin: 10px 0 0;
+}
+
+/* "Open" from a calendar popup lands on the Ideas board with the card
+   briefly outlined, so the eye finds it. */
+.kanban-card.just-opened {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* The rename/clear popover's Clear button (LUV-51). */
@@ -2464,6 +2561,26 @@ button.primary:active {
   white-space: nowrap;
   min-width: 0;
 }
+/* Name plus a small pencil, so the bar reads as something you can
+   click (LUV-52). The pencil doesn't shrink: a narrow bar cuts the
+   name short first. */
+.cal-location-bar .loc-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.loc-edit-hint {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--ink-soft);
+}
 /* Carries on from last week, or into next week: square that end off. */
 .cal-location-bar.loc-starts-earlier {
   border-top-left-radius: 4px;
@@ -2526,19 +2643,3 @@ button.primary:active {
   font-style: italic;
 }
 
-/* Collision flag (LUV-7 Step 3) - ambient warning when two DIFFERENT
-   ideas share the exact same footprint (see the multi-item-stacking
-   decision - this is never blocked or evicted, just flagged in case
-   it's an accidental double-booking rather than intentional). Scoped
-   to regular slots only this pass - see product-decisions.md's
-   "Phase 4, Step 3" for why All Day/Lodging aren't included yet
-   (LUV-26). Reuses --danger, same token the reservation-cancellation
-   confirm and delete buttons use for "pay attention here." */
-.cal-placed-card.has-conflict {
-  border-color: var(--danger);
-}
-.conflict-badge {
-  color: var(--danger);
-  margin-left: 2px;
-  flex-shrink: 0;
-}
